@@ -1,15 +1,11 @@
 package com.piggybank.manager.controller;
 
-import com.piggybank.manager.domain.BorrowBill;
-import com.piggybank.manager.domain.DepositBill;
 import com.piggybank.manager.dto.ApiResponse;
 import com.piggybank.manager.dto.BillDtos;
 import com.piggybank.manager.service.BorrowService;
 import com.piggybank.manager.service.DepositService;
 import com.piggybank.manager.util.AuthContext;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -34,11 +30,9 @@ public class ReportController {
     public ApiResponse<?> report(@ModelAttribute BillDtos.ReportQuery query) {
         Long ownerId = AuthContext.get().getId();
         if ("DEPOSIT".equalsIgnoreCase(query.getType())) {
-            List<DepositBill> items = depositService.report(ownerId, query.getStartDate(), query.getEndDate());
-            return ApiResponse.ok(Map.of("total", depositService.sum(items), "items", items));
+            return ApiResponse.ok(depositService.reportGroups(ownerId, query.getStartDate(), query.getEndDate(), query.getName(), query.getPage(), query.getSize()));
         }
-        List<BorrowBill> items = borrowService.report(ownerId, query.getStartDate(), query.getEndDate(), query.getName());
-        return ApiResponse.ok(Map.of("total", borrowService.sum(items), "items", items));
+        return ApiResponse.ok(borrowService.reportGroups(ownerId, query.getStartDate(), query.getEndDate(), query.getName(), query.getPage(), query.getSize()));
     }
 
     @GetMapping("/export")
@@ -48,13 +42,13 @@ public class ReportController {
         String filename;
         if ("DEPOSIT".equalsIgnoreCase(query.getType())) {
             filename = "deposit-report.csv";
-            csv = "金额,银行,存款日期,到期日期,状态\n" + depositService.report(ownerId, query.getStartDate(), query.getEndDate()).stream()
-                    .map(b -> b.getAmount() + "," + safe(b.getBank()) + "," + b.getDepositDate() + "," + b.getDueDate() + "," + statusText(b.getStatus()))
+            csv = "存款人,金额,已取金额,剩余金额,银行,存款日期,到期日期,状态,备注\n" + depositService.report(ownerId, query.getStartDate(), query.getEndDate(), query.getName()).stream()
+                    .map(b -> safe(b.getDepositorName()) + "," + b.getAmount() + "," + b.getWithdrawnAmount() + "," + b.getRemainingAmount() + "," + safe(b.getBank()) + "," + b.getDepositDate() + "," + b.getDueDate() + "," + statusText(b.getStatus()) + "," + safe(b.getRemark()))
                     .reduce("", (a, b) -> a + b + "\n");
         } else {
             filename = "borrow-report.csv";
-            csv = "借款人,手机号,邮箱,金额,借款日期,还款日期,状态,审核状态\n" + borrowService.report(ownerId, query.getStartDate(), query.getEndDate(), query.getName()).stream()
-                    .map(b -> safe(b.getBorrowerName()) + "," + safe(b.getPhone()) + "," + safe(b.getEmail()) + "," + b.getAmount() + "," + b.getBorrowDate() + "," + b.getDueDate() + "," + statusText(b.getStatus()) + "," + auditText(b.getAuditStatus()))
+            csv = "借款人,手机号,邮箱,借款金额,已还金额,待还金额,借款日期,还款日期,状态,审核状态,备注\n" + borrowService.report(ownerId, query.getStartDate(), query.getEndDate(), query.getName()).stream()
+                    .map(b -> safe(b.getBorrowerName()) + "," + safe(b.getPhone()) + "," + safe(b.getEmail()) + "," + b.getAmount() + "," + b.getPaidAmount() + "," + b.getRemainingAmount() + "," + b.getBorrowDate() + "," + b.getDueDate() + "," + statusText(b.getStatus()) + "," + auditText(b.getAuditStatus()) + "," + safe(b.getRemark()))
                     .reduce("", (a, b) -> a + b + "\n");
         }
         byte[] bytes = ("\uFEFF" + csv).getBytes(StandardCharsets.UTF_8);

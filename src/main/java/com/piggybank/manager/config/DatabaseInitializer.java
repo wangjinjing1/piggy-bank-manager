@@ -40,8 +40,11 @@ public class DatabaseInitializer implements ApplicationRunner {
                   phone VARCHAR(50) NOT NULL,
                   email VARCHAR(255) NOT NULL,
                   amount DECIMAL(18,2) NOT NULL,
+                  paid_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                  remaining_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
                   borrow_date DATE NOT NULL,
                   due_date DATE NOT NULL,
+                  remark VARCHAR(100),
                   source_type VARCHAR(32) NOT NULL,
                   audit_status VARCHAR(32) NOT NULL,
                   audit_mail_status VARCHAR(32),
@@ -62,6 +65,23 @@ public class DatabaseInitializer implements ApplicationRunner {
         addColumnIfMissing("borrow_bill", "reminder_mail_status", "VARCHAR(32)");
         addColumnIfMissing("borrow_bill", "reminder_mail_sent_at", "DATETIME");
         addColumnIfMissing("borrow_bill", "reminder_mail_error", "VARCHAR(500)");
+        addColumnIfMissing("borrow_bill", "paid_amount", "DECIMAL(18,2) NOT NULL DEFAULT 0");
+        addColumnIfMissing("borrow_bill", "remaining_amount", "DECIMAL(18,2) NOT NULL DEFAULT 0");
+        addColumnIfMissing("borrow_bill", "remark", "VARCHAR(100)");
+        jdbcTemplate.execute("UPDATE borrow_bill SET remaining_amount = amount - paid_amount WHERE remaining_amount = 0 AND amount > paid_amount");
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS borrow_repayment (
+                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                  borrow_bill_id BIGINT NOT NULL,
+                  owner_user_id BIGINT NOT NULL,
+                  amount DECIMAL(18,2) NOT NULL,
+                  repayment_date DATE NOT NULL,
+                  remark VARCHAR(100),
+                  created_at DATETIME NOT NULL,
+                  INDEX idx_repayment_bill (borrow_bill_id),
+                  INDEX idx_repayment_owner (owner_user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS borrow_link (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -78,15 +98,38 @@ public class DatabaseInitializer implements ApplicationRunner {
                 CREATE TABLE IF NOT EXISTS deposit_bill (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
                   owner_user_id BIGINT NOT NULL,
+                  depositor_name VARCHAR(120) NOT NULL DEFAULT '',
                   amount DECIMAL(18,2) NOT NULL,
+                  withdrawn_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                  remaining_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
                   bank VARCHAR(120) NOT NULL,
                   deposit_date DATE NOT NULL,
                   due_date DATE NOT NULL,
                   status VARCHAR(32) NOT NULL,
+                  remark VARCHAR(100),
                   created_at DATETIME NOT NULL,
                   updated_at DATETIME NOT NULL,
                   INDEX idx_deposit_owner (owner_user_id),
                   INDEX idx_deposit_due (due_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """);
+        addColumnIfMissing("deposit_bill", "depositor_name", "VARCHAR(120) NOT NULL DEFAULT ''");
+        addColumnIfMissing("deposit_bill", "withdrawn_amount", "DECIMAL(18,2) NOT NULL DEFAULT 0");
+        addColumnIfMissing("deposit_bill", "remaining_amount", "DECIMAL(18,2) NOT NULL DEFAULT 0");
+        addColumnIfMissing("deposit_bill", "remark", "VARCHAR(100)");
+        jdbcTemplate.execute("UPDATE deposit_bill SET remaining_amount = amount - withdrawn_amount WHERE remaining_amount = 0 AND amount > withdrawn_amount");
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS deposit_withdrawal (
+                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                  deposit_bill_id BIGINT NOT NULL,
+                  owner_user_id BIGINT NOT NULL,
+                  depositor_name VARCHAR(120) NOT NULL,
+                  amount DECIMAL(18,2) NOT NULL,
+                  withdrawal_date DATE NOT NULL,
+                  remark VARCHAR(100),
+                  created_at DATETIME NOT NULL,
+                  INDEX idx_withdrawal_bill (deposit_bill_id),
+                  INDEX idx_withdrawal_owner (owner_user_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """);
         jdbcTemplate.execute("""

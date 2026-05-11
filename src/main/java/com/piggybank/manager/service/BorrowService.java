@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.piggybank.manager.config.AppProperties;
 import com.piggybank.manager.domain.BorrowBill;
 import com.piggybank.manager.domain.BorrowLink;
+import com.piggybank.manager.domain.BorrowRepayment;
 import com.piggybank.manager.dto.BillDtos;
 import com.piggybank.manager.mapper.BorrowBillMapper;
 import com.piggybank.manager.mapper.BorrowLinkMapper;
+import com.piggybank.manager.mapper.BorrowRepaymentMapper;
 import com.piggybank.manager.util.DateFormatUtil;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -27,13 +29,15 @@ public class BorrowService {
     private static final LocalDate FAR_FUTURE = LocalDate.of(9999, 12, 31);
     private final BorrowBillMapper billMapper;
     private final BorrowLinkMapper linkMapper;
+    private final BorrowRepaymentMapper repaymentMapper;
     private final AppProperties properties;
     private final MailService mailService;
     private final SecureRandom random = new SecureRandom();
 
-    public BorrowService(BorrowBillMapper billMapper, BorrowLinkMapper linkMapper, AppProperties properties, MailService mailService) {
+    public BorrowService(BorrowBillMapper billMapper, BorrowLinkMapper linkMapper, BorrowRepaymentMapper repaymentMapper, AppProperties properties, MailService mailService) {
         this.billMapper = billMapper;
         this.linkMapper = linkMapper;
+        this.repaymentMapper = repaymentMapper;
         this.properties = properties;
         this.mailService = mailService;
     }
@@ -46,8 +50,11 @@ public class BorrowService {
         bill.setPhone(request.getPhone());
         bill.setEmail(request.getEmail());
         bill.setAmount(request.getAmount());
+        bill.setPaidAmount(BigDecimal.ZERO);
+        bill.setRemainingAmount(request.getAmount());
         bill.setBorrowDate(request.getBorrowDate() == null ? LocalDate.now() : request.getBorrowDate());
         bill.setDueDate(request.getDueDate() == null ? FAR_FUTURE : request.getDueDate());
+        bill.setRemark(request.getRemark());
         bill.setSourceType(sourceType);
         bill.setAuditStatus(auditStatus);
         bill.setAuditMailStatus("NOT_SENT");
@@ -64,8 +71,8 @@ public class BorrowService {
                 .orderByDesc(BorrowBill::getCreatedAt));
     }
 
-    public List<BorrowBill> list(Long ownerId, BillDtos.BorrowListQuery query) {
-        return billMapper.selectList(new LambdaQueryWrapper<BorrowBill>()
+    public Map<String, Object> list(Long ownerId, BillDtos.BorrowListQuery query) {
+        List<BorrowBill> bills = billMapper.selectList(new LambdaQueryWrapper<BorrowBill>()
                 .eq(BorrowBill::getOwnerUserId, ownerId)
                 .like(StringUtils.hasText(query.getBorrowerName()), BorrowBill::getBorrowerName, query.getBorrowerName())
                 .like(StringUtils.hasText(query.getPhone()), BorrowBill::getPhone, query.getPhone())
@@ -75,6 +82,7 @@ public class BorrowService {
                 .ge(query.getDueStartDate() != null, BorrowBill::getDueDate, query.getDueStartDate())
                 .le(query.getDueEndDate() != null, BorrowBill::getDueDate, query.getDueEndDate())
                 .orderByDesc(BorrowBill::getCreatedAt));
+        return page(bills, query.getPage(), query.getSize());
     }
 
     public BorrowBill approve(Long ownerId, Long id) {
@@ -101,11 +109,67 @@ public class BorrowService {
         bill.setPhone(request.getPhone());
         bill.setEmail(request.getEmail());
         bill.setAmount(request.getAmount());
+        BigDecimal paid = bill.getPaidAmount() == null ? BigDecimal.ZERO : bill.getPaidAmount();
+        if (request.getAmount().compareTo(paid) < 0) {
+            throw new IllegalArgumentException("借款金额不能小于已还金额");
+        }
+        bill.setRemainingAmount(request.getAmount().subtract(paid));
         bill.setBorrowDate(request.getBorrowDate() == null ? LocalDate.now() : request.getBorrowDate());
         bill.setDueDate(request.getDueDate() == null ? FAR_FUTURE : request.getDueDate());
+        bill.setRemark(request.getRemark());
         bill.setUpdatedAt(LocalDateTime.now());
         billMapper.updateById(bill);
         return bill;
+    }
+
+    @Transactional
+    public BorrowRepayment repay(Long ownerId, Long id, BillDtos.RepaymentRequest request) {
+        BorrowBill bill = getOwned(ownerId, id);
+        BigDecimal amount = request.getAmount();
+        BigDecimal remaining = bill.getRemainingAmount() == null ? bill.getAmount() : bill.getRemainingAmount();
+        if (amount.compareTo(remaining) > 0) {
+            throw new IllegalArgumentException("还款金额不能大于待还金额");
+        }
+        BorrowRepayment repayment = new BorrowRepayment();
+        repayment.setBorrowBillId(id);
+        repayment.setOwnerUserId(ownerId);
+        repayment.setAmount(amount);
+        repayment.setRepaymentDate(request.getRepaymentDate() == null ? LocalDate.now() : request.getRepaymentDate());
+        repayment.setRemark(request.getRemark());
+        repayment.setCreatedAt(LocalDateTime.now());
+        repaymentMapper.insert(repayment);
+
+        BigDecimal paid = bill.getPaidAmount() == null ? BigDecimal.ZERO : bill.getPaidAmount();
+        bill.setPaidAmount(paid.add(amount));
+        bill.setRemainingAmount(remaining.subtract(amount));
+        bill.setUpdatedAt(LocalDateTime.now());
+        billMapper.updateById(bill);
+        return repayment;
+    }
+
+    public Map<String, Object> detail(Long ownerId, Long id, int page, int size) {
+        BorrowBill bill = getOwned(ownerId, id);
+        List<BorrowRepayment> records = repaymentMapper.selectList(new LambdaQueryWrapper<BorrowRepayment>()
+                .eq(BorrowRepayment::getBorrowBillId, id)
+                .orderByDesc(BorrowRepayment::getRepaymentDate)
+                .orderByDesc(BorrowRepayment::getCreatedAt));
+        return Map.of("bill", bill, "repayments", page(records, page, size));
+    }
+
+    @Transactional
+    public void deleteRepayment(Long ownerId, Long billId, Long repaymentId) {
+        BorrowBill bill = getOwned(ownerId, billId);
+        BorrowRepayment repayment = repaymentMapper.selectById(repaymentId);
+        if (repayment == null || !billId.equals(repayment.getBorrowBillId()) || !ownerId.equals(repayment.getOwnerUserId())) {
+            throw new IllegalArgumentException("还款记录不存在");
+        }
+        repaymentMapper.deleteById(repaymentId);
+        BigDecimal paid = bill.getPaidAmount() == null ? BigDecimal.ZERO : bill.getPaidAmount();
+        BigDecimal remaining = bill.getRemainingAmount() == null ? bill.getAmount() : bill.getRemainingAmount();
+        bill.setPaidAmount(paid.subtract(repayment.getAmount()).max(BigDecimal.ZERO));
+        bill.setRemainingAmount(remaining.add(repayment.getAmount()).min(bill.getAmount()));
+        bill.setUpdatedAt(LocalDateTime.now());
+        billMapper.updateById(bill);
     }
 
     public BorrowBill updateOwner(Long id, Long ownerUserId) {
@@ -227,7 +291,27 @@ public class BorrowService {
     }
 
     public BigDecimal sum(List<BorrowBill> bills) {
-        return bills.stream().map(BorrowBill::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return bills.stream().map(b -> b.getRemainingAmount() == null ? b.getAmount() : b.getRemainingAmount()).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public Map<String, Object> reportGroups(Long ownerId, LocalDate start, LocalDate end, String name, int page, int size) {
+        List<Map<String, Object>> groups = report(ownerId, start, end, name).stream()
+                .collect(Collectors.groupingBy(BorrowBill::getBorrowerName, LinkedHashMap::new, Collectors.toList()))
+                .entrySet().stream()
+                .map(entry -> {
+                    List<BorrowBill> bills = entry.getValue();
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("name", entry.getKey());
+                    data.put("count", bills.size());
+                    data.put("total", sum(bills));
+                    data.put("items", bills);
+                    return data;
+                })
+                .toList();
+        BigDecimal total = groups.stream()
+                .map(item -> (BigDecimal) item.get("total"))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return Map.of("total", total, "groups", page(groups, page, size));
     }
 
     private void sendAuditApprovedMail(BorrowBill bill) {
@@ -277,5 +361,13 @@ public class BorrowService {
 
     private String normalizeStatus(String status) {
         return "VOID".equalsIgnoreCase(status) ? "VOID" : "NORMAL";
+    }
+
+    private <T> Map<String, Object> page(List<T> items, int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        int from = Math.min((safePage - 1) * safeSize, items.size());
+        int to = Math.min(from + safeSize, items.size());
+        return Map.of("page", safePage, "size", safeSize, "total", items.size(), "items", items.subList(from, to));
     }
 }

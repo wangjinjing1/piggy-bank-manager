@@ -41,6 +41,23 @@ public class BorrowController {
         return ApiResponse.ok(borrowService.update(AuthContext.get().getId(), id, request));
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<?> detail(@PathVariable Long id,
+                                 @ModelAttribute BillDtos.ReportQuery query) {
+        return ApiResponse.ok(borrowService.detail(AuthContext.get().getId(), id, query.getPage(), query.getSize()));
+    }
+
+    @PostMapping("/{id}/repayments")
+    public ApiResponse<?> repay(@PathVariable Long id, @Valid @RequestBody BillDtos.RepaymentRequest request) {
+        return ApiResponse.ok(borrowService.repay(AuthContext.get().getId(), id, request));
+    }
+
+    @DeleteMapping("/{id}/repayments/{repaymentId}")
+    public ApiResponse<?> deleteRepayment(@PathVariable Long id, @PathVariable Long repaymentId) {
+        borrowService.deleteRepayment(AuthContext.get().getId(), id, repaymentId);
+        return ApiResponse.ok(true);
+    }
+
     @PostMapping("/links")
     public ApiResponse<?> createLink() {
         return ApiResponse.ok(Map.of("url", borrowService.createLink(AuthContext.get().getId())));

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -22,6 +23,8 @@ public class BillDtos {
         private BigDecimal amount;
         private LocalDate borrowDate;
         private LocalDate dueDate;
+        @Size(max = 100)
+        private String remark;
 
         public String getBorrowerName() { return borrowerName; }
         public void setBorrowerName(String borrowerName) { this.borrowerName = borrowerName; }
@@ -37,9 +40,13 @@ public class BillDtos {
         public void setBorrowDate(LocalDate borrowDate) { this.borrowDate = borrowDate; }
         public LocalDate getDueDate() { return dueDate; }
         public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
+        public String getRemark() { return remark; }
+        public void setRemark(String remark) { this.remark = remark; }
     }
 
     public static class DepositRequest {
+        @NotBlank
+        private String depositorName;
         @NotNull
         @DecimalMin("0.01")
         private BigDecimal amount;
@@ -49,7 +56,11 @@ public class BillDtos {
         @NotNull
         private LocalDate dueDate;
         private String status = "NORMAL";
+        @Size(max = 100)
+        private String remark;
 
+        public String getDepositorName() { return depositorName; }
+        public void setDepositorName(String depositorName) { this.depositorName = depositorName; }
         public BigDecimal getAmount() { return amount; }
         public void setAmount(BigDecimal amount) { this.amount = amount; }
         public String getBank() { return bank; }
@@ -60,6 +71,8 @@ public class BillDtos {
         public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
+        public String getRemark() { return remark; }
+        public void setRemark(String remark) { this.remark = remark; }
     }
 
     public static class ReportQuery {
@@ -67,6 +80,8 @@ public class BillDtos {
         private LocalDate startDate;
         private LocalDate endDate;
         private String name;
+        private int page = 1;
+        private int size = 10;
 
         public String getType() { return type; }
         public void setType(String type) { this.type = type; }
@@ -76,6 +91,10 @@ public class BillDtos {
         public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
+        public int getPage() { return page; }
+        public void setPage(int page) { this.page = page; }
+        public int getSize() { return size; }
+        public void setSize(int size) { this.size = size; }
     }
 
     public static class BorrowListQuery {
@@ -86,6 +105,8 @@ public class BillDtos {
         private LocalDate borrowEndDate;
         private LocalDate dueStartDate;
         private LocalDate dueEndDate;
+        private int page = 1;
+        private int size = 5;
 
         public String getBorrowerName() { return borrowerName; }
         public void setBorrowerName(String borrowerName) { this.borrowerName = borrowerName; }
@@ -101,15 +122,24 @@ public class BillDtos {
         public void setDueStartDate(LocalDate dueStartDate) { this.dueStartDate = dueStartDate; }
         public LocalDate getDueEndDate() { return dueEndDate; }
         public void setDueEndDate(LocalDate dueEndDate) { this.dueEndDate = dueEndDate; }
+        public int getPage() { return page; }
+        public void setPage(int page) { this.page = page; }
+        public int getSize() { return size; }
+        public void setSize(int size) { this.size = size; }
     }
 
     public static class DepositListQuery {
+        private String depositorName;
         private String bank;
         private LocalDate depositStartDate;
         private LocalDate depositEndDate;
         private LocalDate dueStartDate;
         private LocalDate dueEndDate;
+        private int page = 1;
+        private int size = 5;
 
+        public String getDepositorName() { return depositorName; }
+        public void setDepositorName(String depositorName) { this.depositorName = depositorName; }
         public String getBank() { return bank; }
         public void setBank(String bank) { this.bank = bank; }
         public LocalDate getDepositStartDate() { return depositStartDate; }
@@ -120,5 +150,45 @@ public class BillDtos {
         public void setDueStartDate(LocalDate dueStartDate) { this.dueStartDate = dueStartDate; }
         public LocalDate getDueEndDate() { return dueEndDate; }
         public void setDueEndDate(LocalDate dueEndDate) { this.dueEndDate = dueEndDate; }
+        public int getPage() { return page; }
+        public void setPage(int page) { this.page = page; }
+        public int getSize() { return size; }
+        public void setSize(int size) { this.size = size; }
+    }
+
+    public static class RepaymentRequest {
+        @NotNull
+        @DecimalMin("0.01")
+        private BigDecimal amount;
+        private LocalDate repaymentDate;
+        @Size(max = 100)
+        private String remark;
+
+        public BigDecimal getAmount() { return amount; }
+        public void setAmount(BigDecimal amount) { this.amount = amount; }
+        public LocalDate getRepaymentDate() { return repaymentDate; }
+        public void setRepaymentDate(LocalDate repaymentDate) { this.repaymentDate = repaymentDate; }
+        public String getRemark() { return remark; }
+        public void setRemark(String remark) { this.remark = remark; }
+    }
+
+    public static class WithdrawalRequest {
+        @NotBlank
+        private String depositorName;
+        @NotNull
+        @DecimalMin("0.01")
+        private BigDecimal amount;
+        private LocalDate withdrawalDate;
+        @Size(max = 100)
+        private String remark;
+
+        public String getDepositorName() { return depositorName; }
+        public void setDepositorName(String depositorName) { this.depositorName = depositorName; }
+        public BigDecimal getAmount() { return amount; }
+        public void setAmount(BigDecimal amount) { this.amount = amount; }
+        public LocalDate getWithdrawalDate() { return withdrawalDate; }
+        public void setWithdrawalDate(LocalDate withdrawalDate) { this.withdrawalDate = withdrawalDate; }
+        public String getRemark() { return remark; }
+        public void setRemark(String remark) { this.remark = remark; }
     }
 }

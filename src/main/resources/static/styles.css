@@ -84,8 +84,12 @@ td small { display: block; color: var(--muted); margin-top: 4px; }
 }
 .date-field input:focus + span { color: var(--muted); }
 .total { width: fit-content; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; font-size: 20px; font-weight: 700; }
+.pager { display: flex; align-items: center; gap: 10px; justify-content: flex-end; color: var(--muted); }
+.pager button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 .modal-mask { position: fixed; inset: 0; z-index: 20; background: rgba(7, 15, 24, .48); display: grid; place-items: center; padding: 18px; }
 .modal { position: relative; z-index: 21; width: min(560px, 100%); max-height: calc(100vh - 36px); overflow: auto; background: var(--panel); border-radius: 8px; padding: 24px; box-shadow: 0 20px 60px rgba(7, 15, 24, .22); }
+.wide-modal { width: min(900px, 100%); display: grid; gap: 14px; }
+.detail-summary { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); }
 .modal-actions { justify-content: flex-end; margin-top: 10px; }
 @media (max-width: 760px) {
   .app-shell { display: block; min-height: 100vh; }
@@ -124,6 +128,7 @@ td small { display: block; color: var(--muted); margin-top: 4px; }
   .filters { grid-template-columns: 1fr; align-items: stretch; }
   .filter-actions { width: 100%; }
   .filter-actions button { flex: 1; }
+  .pager { justify-content: center; flex-wrap: wrap; }
   .table-wrap { border-radius: 8px; width: 100%; max-width: 100%; }
   table { width: max-content; min-width: 960px; }
   th, td { padding: 11px 12px; }

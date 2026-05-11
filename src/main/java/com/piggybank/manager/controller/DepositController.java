@@ -41,6 +41,17 @@ public class DepositController {
         return ApiResponse.ok(depositService.update(AuthContext.get().getId(), id, request));
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<?> detail(@PathVariable Long id,
+                                 @ModelAttribute BillDtos.ReportQuery query) {
+        return ApiResponse.ok(depositService.detail(AuthContext.get().getId(), id, query.getPage(), query.getSize()));
+    }
+
+    @PostMapping("/{id}/withdrawals")
+    public ApiResponse<?> withdraw(@PathVariable Long id, @Valid @RequestBody BillDtos.WithdrawalRequest request) {
+        return ApiResponse.ok(depositService.withdraw(AuthContext.get().getId(), id, request));
+    }
+
     @PatchMapping("/{id}/status")
     public ApiResponse<?> status(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return ApiResponse.ok(depositService.updateStatus(AuthContext.get().getId(), id, body.get("status")));

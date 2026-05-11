@@ -14,8 +14,11 @@ public class BorrowBill {
     private String phone;
     private String email;
     private BigDecimal amount;
+    private BigDecimal paidAmount;
+    private BigDecimal remainingAmount;
     private LocalDate borrowDate;
     private LocalDate dueDate;
+    private String remark;
     private String sourceType;
     private String auditStatus;
     private String auditMailStatus;
@@ -41,10 +44,16 @@ public class BorrowBill {
     public void setEmail(String email) { this.email = email; }
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+    public BigDecimal getRemainingAmount() { return remainingAmount; }
+    public void setRemainingAmount(BigDecimal remainingAmount) { this.remainingAmount = remainingAmount; }
     public LocalDate getBorrowDate() { return borrowDate; }
     public void setBorrowDate(LocalDate borrowDate) { this.borrowDate = borrowDate; }
     public LocalDate getDueDate() { return dueDate; }
     public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
+    public String getRemark() { return remark; }
+    public void setRemark(String remark) { this.remark = remark; }
     public String getSourceType() { return sourceType; }
     public void setSourceType(String sourceType) { this.sourceType = sourceType; }
     public String getAuditStatus() { return auditStatus; }
