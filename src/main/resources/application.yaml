@@ -1,0 +1,57 @@
+server:
+  port: ${SERVER_PORT:8080}        # 应用监听端口，默认8080，可通过环境变量 SERVER_PORT 覆盖
+  address: 0.0.0.0                 # 应用绑定地址，0.0.0.0表示对所有网卡开放
+
+spring:
+  datasource:
+    # 数据库连接配置，敏感信息可通过 .env 或系统环境变量注入
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/piggy_bank?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true}
+    # JDBC连接URL，默认连接本地 piggy_bank 数据库
+    username: ${SPRING_DATASOURCE_USERNAME:root}  # 数据库用户名，默认 root
+    password: ${SPRING_DATASOURCE_PASSWORD:root}  # 数据库密码，默认 root
+    driver-class-name: com.mysql.cj.jdbc.Driver  # 数据库驱动类
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.example.com}  # SMTP邮件服务器地址
+    port: ${SPRING_MAIL_PORT:587}               # SMTP端口，587通常用于STARTTLS
+    protocol: ${SPRING_MAIL_PROTOCOL:smtp}     # 协议类型
+    default-encoding: UTF-8                     # 邮件默认编码
+    username: ${SPRING_MAIL_USERNAME:}         # SMTP用户名
+    password: ${SPRING_MAIL_PASSWORD:}         # SMTP密码
+    properties:
+      mail:
+        smtp:
+          auth: true                           # 是否需要身份验证
+          ssl:
+            enable: ${SPRING_MAIL_SSL_ENABLE:false}  # 是否启用SSL
+          starttls:
+            enable: ${SPRING_MAIL_STARTTLS_ENABLE:true}  # 是否启用STARTTLS
+          timeout: 5000                         # 邮件发送超时（毫秒）
+          connectiontimeout: 5000               # 连接超时（毫秒）
+          writetimeout: 5000                    # 写操作超时（毫秒）
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true         # 数据库下划线字段自动映射到Java驼峰命名
+  global-config:
+    db-config:
+      id-type: auto                             # 主键ID生成策略，auto表示数据库自增
+
+app:
+  encryption-key: ${APP_ENCRYPTION_KEY:change-this-secret-key-at-least-32-chars}
+  # 对称加密密钥，用于加密敏感数据，建议至少32位
+  token-secret: ${APP_TOKEN_SECRET:change-this-token-secret-at-least-32-chars}
+  # JWT或自定义Token签名密钥，建议至少32位
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  # 应用对外访问基础URL
+  reminder-cron: ${APP_REMINDER_CRON:0 0 9 * * ?}
+  # 定时提醒Cron表达式，默认每天9点触发
+  startup-mail:
+    enabled: ${APP_STARTUP_MAIL_ENABLED:false}   # 启动时是否发送邮件通知
+    to: ${APP_STARTUP_MAIL_TO:}                 # 启动邮件接收人
+  security:
+    max-requests-per-ip-per-day: ${APP_SECURITY_MAX_REQUESTS_PER_IP_PER_DAY:200}
+    # 单IP每天最大请求次数限制，用于防刷
+  admin:
+    username: ${APP_ADMIN_USERNAME:admin}      # 管理员用户名
+    password: ${APP_ADMIN_PASSWORD:amdin}     # 管理员密码（注意默认值有拼写错误，应修正为 admin）
+    email: ${APP_ADMIN_EMAIL:admin@example.com}  # 管理员邮箱

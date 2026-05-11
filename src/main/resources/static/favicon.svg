@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="借存管理">
+  <rect width="64" height="64" rx="14" fill="#0f766e"/>
+  <path d="M16 35c0-9.4 7.5-16 18.2-16H43c3.4 0 6.2 2.8 6.2 6.2v.8h3.3c1.3 0 2.3 1 2.3 2.3v5.2c0 1.3-1 2.3-2.3 2.3h-3.4c-.8 3.6-3.1 6.7-6.4 8.7v4.3c0 1.1-.9 2-2 2h-4.4c-1.1 0-2-.9-2-2v-2.1h-8.2v2.1c0 1.1-.9 2-2 2h-4.4c-1.1 0-2-.9-2-2v-4.1A15.1 15.1 0 0 1 16 35Z" fill="#f7f3e8"/>
+  <path d="M23 19.7c-2.2-4.6.1-7.8 3.6-7.8 3.2 0 5.5 2 7.3 5.1" fill="none" stroke="#f7f3e8" stroke-width="4" stroke-linecap="round"/>
+  <path d="M29 24h11" stroke="#0f766e" stroke-width="3.4" stroke-linecap="round"/>
+  <circle cx="43.6" cy="29" r="2.3" fill="#0f766e"/>
+  <path d="M23.5 36.5h17" stroke="#14b8a6" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 28v17" stroke="#14b8a6" stroke-width="4" stroke-linecap="round"/>
+</svg>

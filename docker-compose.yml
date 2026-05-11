@@ -1,0 +1,14 @@
+services:
+  piggy-bank-manager:
+    container_name: piggy-bank-manager
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+    image: wangjinjing/piggy-bank-manager:latest
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Duser.timezone=Asia/Shanghai}
+    ports:
+      - "8080:8080"
