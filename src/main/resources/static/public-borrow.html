@@ -9,14 +9,19 @@
 </head>
 <body>
 <div id="publicApp" class="login-shell" v-cloak>
-  <form class="login-panel wide" v-if="!done" @submit.prevent="submit">
+  <section class="login-panel" v-if="used">
+    <h1>链接已使用</h1>
+    <p class="hint">该匿名填写链接已经提交过，不能重复填写。</p>
+  </section>
+  <form class="login-panel wide" v-else-if="!done" @submit.prevent="submit">
     <h1>填写借款信息</h1>
     <label>借款人姓名<input v-model.trim="form.borrowerName" required></label>
     <label>手机号<input v-model.trim="form.phone" required></label>
     <label>邮箱<input type="email" v-model.trim="form.email" required></label>
     <label>借款金额<input type="number" min="0.01" step="0.01" v-model.number="form.amount" required></label>
     <label>借款日期<span class="date-field"><input type="date" v-model="form.borrowDate" required><span v-if="!form.borrowDate">年 / 月 / 日</span></span></label>
-    <label>还款日期<span class="date-field"><input type="date" v-model="form.dueDate"><span v-if="!form.dueDate">年 / 月 / 日</span></span></label>
+    <label>还款日期<span class="date-field"><input type="date" v-model="form.dueDate" required><span v-if="!form.dueDate">年 / 月 / 日</span></span></label>
+    <label>借款事由<input v-model.trim="form.remark" maxlength="100" required></label>
     <button class="primary">提交</button>
     <p class="error" v-if="error">{{ error }}</p>
   </form>
@@ -31,7 +36,17 @@ const token = new URLSearchParams(location.search).get('token');
 Vue.createApp({
   data() {
     const today = new Date().toISOString().slice(0, 10);
-    return { done: false, error: '', form: { borrowerName: '', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31' } };
+    return { done: false, used: false, error: '', form: { borrowerName: '', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31', remark: '' } };
+  },
+  async mounted() {
+    try {
+      const res = await fetch(`/api/public/borrow-links/${token}`);
+      const json = await res.json();
+      if (!json.success) { this.error = json.message || '链接不可用'; return; }
+      this.used = !!json.data.used;
+    } catch (e) {
+      this.error = e.message;
+    }
   },
   methods: {
     async submit() {

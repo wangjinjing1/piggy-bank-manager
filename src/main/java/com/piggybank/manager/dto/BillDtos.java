@@ -48,12 +48,10 @@ public class BillDtos {
         @NotBlank
         private String depositorName;
         @NotNull
-        @DecimalMin("0.01")
         private BigDecimal amount;
         @NotBlank
         private String bank;
         private LocalDate depositDate;
-        @NotNull
         private LocalDate dueDate;
         private String status = "NORMAL";
         @Size(max = 100)
@@ -178,7 +176,9 @@ public class BillDtos {
         @NotNull
         @DecimalMin("0.01")
         private BigDecimal amount;
+        @NotNull
         private LocalDate withdrawalDate;
+        @NotBlank
         @Size(max = 100)
         private String remark;
 
@@ -190,5 +190,31 @@ public class BillDtos {
         public void setWithdrawalDate(LocalDate withdrawalDate) { this.withdrawalDate = withdrawalDate; }
         public String getRemark() { return remark; }
         public void setRemark(String remark) { this.remark = remark; }
+    }
+
+    public static class PublicBorrowRequest extends BorrowRequest {
+        @Override
+        @NotNull
+        public LocalDate getBorrowDate() { return super.getBorrowDate(); }
+
+        @Override
+        @NotNull
+        public LocalDate getDueDate() { return super.getDueDate(); }
+
+        @Override
+        @NotBlank
+        @Size(max = 100)
+        public String getRemark() { return super.getRemark(); }
+    }
+
+    public static class PublicWithdrawalRequest extends WithdrawalRequest {
+        @Override
+        @NotNull
+        public LocalDate getWithdrawalDate() { return super.getWithdrawalDate(); }
+
+        @Override
+        @NotBlank
+        @Size(max = 100)
+        public String getRemark() { return super.getRemark(); }
     }
 }

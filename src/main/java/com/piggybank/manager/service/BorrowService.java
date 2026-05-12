@@ -215,8 +215,16 @@ public class BorrowService {
         return properties.getPublicBaseUrl() + "/public-borrow.html?token=" + token;
     }
 
+    public Map<String, Object> linkStatus(String token) {
+        BorrowLink link = linkMapper.selectOne(new LambdaQueryWrapper<BorrowLink>().eq(BorrowLink::getToken, token));
+        if (link == null) {
+            throw new IllegalArgumentException("链接不存在");
+        }
+        return Map.of("used", Boolean.TRUE.equals(link.getUsed()));
+    }
+
     @Transactional
-    public BorrowBill submitPublic(String token, BillDtos.BorrowRequest request) {
+    public BorrowBill submitPublic(String token, BillDtos.PublicBorrowRequest request) {
         // 匿名链接提交和标记已使用必须在同一事务里完成，防止链接被重复使用。
         BorrowLink link = linkMapper.selectOne(new LambdaQueryWrapper<BorrowLink>().eq(BorrowLink::getToken, token));
         if (link == null || Boolean.TRUE.equals(link.getUsed())) {

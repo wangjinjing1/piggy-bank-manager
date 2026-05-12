@@ -49,7 +49,7 @@ Vue.createApp({
       detail: {},
       borrowForm: { id: null, ownerUserId: null, borrowerName: '', status: 'NORMAL', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31', remark: '' },
       repayForm: { amount: null, repaymentDate: today, remark: '' },
-      depositForm: { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: today, status: 'NORMAL', remark: '' },
+      depositForm: { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: '9999-12-31', status: 'NORMAL', remark: '' },
       withdrawForm: { depositorName: '', amount: null, withdrawalDate: today, remark: '' },
       userForm: { userId: null, username: '', password: '', email: '' },
       reportQuery: { type: 'BORROW', startDate: '', endDate: '9999-12-31', name: '', page: 1, size: 10 },
@@ -161,11 +161,11 @@ Vue.createApp({
             amount: deposit.amount,
             bank: deposit.bank,
             depositDate: String(deposit.depositDate || today).slice(0, 10),
-            dueDate: String(deposit.dueDate || today).slice(0, 10),
+            dueDate: String(deposit.dueDate || '9999-12-31').slice(0, 10),
             status: deposit.status,
             remark: deposit.remark || ''
           }
-        : { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: today, status: 'NORMAL', remark: '' };
+        : { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: '9999-12-31', status: 'NORMAL', remark: '' };
       this.showDeposit = true;
     },
     openUser(user) {
@@ -248,6 +248,12 @@ Vue.createApp({
       await this.run(async () => {
         const data = await api('/api/borrows/links', { method: 'POST', body: '{}' });
         this.openMessage('匿名填写链接', data.url, data.url);
+      });
+    },
+    async createWithdrawalLink() {
+      await this.run(async () => {
+        const data = await api('/api/deposits/withdrawal-links', { method: 'POST', body: '{}' });
+        this.openMessage('匿名取钱链接', data.url, data.url);
       });
     },
     openMessage(title, text, copyText = '') {

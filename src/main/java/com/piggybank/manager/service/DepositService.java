@@ -2,14 +2,19 @@ package com.piggybank.manager.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.piggybank.manager.domain.DepositBill;
+import com.piggybank.manager.domain.WithdrawalLink;
+import com.piggybank.manager.config.AppProperties;
 import com.piggybank.manager.dto.BillDtos;
 import com.piggybank.manager.mapper.DepositBillMapper;
+import com.piggybank.manager.mapper.WithdrawalLinkMapper;
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Base64;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,19 +24,27 @@ import org.springframework.util.StringUtils;
 public class DepositService {
     private static final LocalDate FAR_FUTURE = LocalDate.of(9999, 12, 31);
     private final DepositBillMapper depositMapper;
+    private final WithdrawalLinkMapper withdrawalLinkMapper;
+    private final AppProperties properties;
+    private final SecureRandom random = new SecureRandom();
 
-    public DepositService(DepositBillMapper depositMapper) {
+    public DepositService(DepositBillMapper depositMapper, WithdrawalLinkMapper withdrawalLinkMapper, AppProperties properties) {
         this.depositMapper = depositMapper;
+        this.withdrawalLinkMapper = withdrawalLinkMapper;
+        this.properties = properties;
     }
 
     public DepositBill create(Long ownerId, BillDtos.DepositRequest request) {
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("存款金额必须大于0");
+        }
         DepositBill bill = new DepositBill();
         bill.setOwnerUserId(ownerId);
         bill.setDepositorName(request.getDepositorName());
         bill.setAmount(request.getAmount());
         bill.setBank(request.getBank());
         bill.setDepositDate(request.getDepositDate() == null ? LocalDate.now() : request.getDepositDate());
-        bill.setDueDate(request.getDueDate());
+        bill.setDueDate(request.getDueDate() == null ? FAR_FUTURE : request.getDueDate());
         bill.setStatus(normalizeStatus(request.getStatus()));
         bill.setRemark(request.getRemark());
         bill.setCreatedAt(LocalDateTime.now());
@@ -69,11 +82,14 @@ public class DepositService {
 
     public DepositBill update(Long ownerId, Long id, BillDtos.DepositRequest request) {
         DepositBill bill = getOwned(ownerId, id);
+        if (request.getAmount().compareTo(BigDecimal.ZERO) == 0) {
+            throw new IllegalArgumentException("金额不能为0");
+        }
         bill.setDepositorName(request.getDepositorName());
         bill.setAmount(request.getAmount());
         bill.setBank(request.getBank());
         bill.setDepositDate(request.getDepositDate() == null ? LocalDate.now() : request.getDepositDate());
-        bill.setDueDate(request.getDueDate());
+        bill.setDueDate(request.getDueDate() == null ? FAR_FUTURE : request.getDueDate());
         bill.setStatus(normalizeStatus(request.getStatus()));
         bill.setRemark(request.getRemark());
         bill.setUpdatedAt(LocalDateTime.now());
@@ -110,6 +126,41 @@ public class DepositService {
         bill.setCreatedAt(LocalDateTime.now());
         bill.setUpdatedAt(LocalDateTime.now());
         depositMapper.insert(bill);
+        return bill;
+    }
+
+    public String createWithdrawalLink(Long ownerId) {
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        WithdrawalLink link = new WithdrawalLink();
+        link.setOwnerUserId(ownerId);
+        link.setToken(token);
+        link.setUsed(false);
+        link.setCreatedAt(LocalDateTime.now());
+        withdrawalLinkMapper.insert(link);
+        return properties.getPublicBaseUrl() + "/public-withdraw.html?token=" + token;
+    }
+
+    public Map<String, Object> withdrawalLinkStatus(String token) {
+        WithdrawalLink link = withdrawalLinkMapper.selectOne(new LambdaQueryWrapper<WithdrawalLink>().eq(WithdrawalLink::getToken, token));
+        if (link == null) {
+            throw new IllegalArgumentException("链接不存在");
+        }
+        return Map.of("used", Boolean.TRUE.equals(link.getUsed()));
+    }
+
+    @Transactional
+    public DepositBill submitPublicWithdrawal(String token, BillDtos.PublicWithdrawalRequest request) {
+        WithdrawalLink link = withdrawalLinkMapper.selectOne(new LambdaQueryWrapper<WithdrawalLink>().eq(WithdrawalLink::getToken, token));
+        if (link == null || Boolean.TRUE.equals(link.getUsed())) {
+            throw new IllegalStateException("链接不存在或已被使用");
+        }
+        DepositBill bill = withdrawByDepositor(link.getOwnerUserId(), request);
+        link.setUsed(true);
+        link.setSubmittedBillId(bill.getId());
+        link.setUsedAt(LocalDateTime.now());
+        withdrawalLinkMapper.updateById(link);
         return bill;
     }
 

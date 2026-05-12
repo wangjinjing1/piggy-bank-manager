@@ -98,6 +98,18 @@ public class DatabaseInitializer implements ApplicationRunner {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """);
         jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS withdrawal_link (
+                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                  owner_user_id BIGINT NOT NULL,
+                  token VARCHAR(80) NOT NULL UNIQUE,
+                  used TINYINT(1) NOT NULL DEFAULT 0,
+                  submitted_bill_id BIGINT,
+                  created_at DATETIME NOT NULL,
+                  used_at DATETIME,
+                  INDEX idx_withdrawal_link_owner (owner_user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """);
+        jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS deposit_bill (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
                   owner_user_id BIGINT NOT NULL,

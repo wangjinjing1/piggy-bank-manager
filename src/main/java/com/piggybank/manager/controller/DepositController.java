@@ -52,6 +52,11 @@ public class DepositController {
         return ApiResponse.ok(depositService.withdrawByDepositor(AuthContext.get().getId(), request));
     }
 
+    @PostMapping("/withdrawal-links")
+    public ApiResponse<?> createWithdrawalLink() {
+        return ApiResponse.ok(Map.of("url", depositService.createWithdrawalLink(AuthContext.get().getId())));
+    }
+
     @PatchMapping("/{id}/status")
     public ApiResponse<?> status(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return ApiResponse.ok(depositService.updateStatus(AuthContext.get().getId(), id, body.get("status")));

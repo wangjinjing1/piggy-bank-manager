@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>填写取钱信息</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="publicWithdrawApp" class="login-shell" v-cloak>
+  <section class="login-panel" v-if="used">
+    <h1>链接已使用</h1>
+    <p class="hint">该匿名取钱链接已经提交过，不能重复填写。</p>
+  </section>
+  <form class="login-panel wide" v-else-if="!done" @submit.prevent="submit">
+    <h1>填写取钱信息</h1>
+    <label>用户名<input v-model.trim="form.depositorName" required></label>
+    <label>取款金额<input type="number" min="0.01" step="0.01" v-model.number="form.amount" required></label>
+    <label>取款日期<span class="date-field"><input type="date" v-model="form.withdrawalDate" required><span v-if="!form.withdrawalDate">年 / 月 / 日</span></span></label>
+    <label>备注<input v-model.trim="form.remark" maxlength="100" required></label>
+    <button class="primary">提交</button>
+    <p class="error" v-if="error">{{ error }}</p>
+  </form>
+  <section class="login-panel" v-else>
+    <h1>提交成功</h1>
+    <p class="hint">取钱信息已提交。</p>
+  </section>
+</div>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const token = new URLSearchParams(location.search).get('token');
+Vue.createApp({
+  data() {
+    const today = new Date().toISOString().slice(0, 10);
+    return { done: false, used: false, error: '', form: { depositorName: '', amount: null, withdrawalDate: today, remark: '' } };
+  },
+  async mounted() {
+    try {
+      const res = await fetch(`/api/public/withdrawal-links/${token}`);
+      const json = await res.json();
+      if (!json.success) { this.error = json.message || '链接不可用'; return; }
+      this.used = !!json.data.used;
+    } catch (e) {
+      this.error = e.message;
+    }
+  },
+  methods: {
+    async submit() {
+      this.error = '';
+      try {
+        const res = await fetch(`/api/public/withdrawal-links/${token}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.form) });
+        const json = await res.json();
+        if (!json.success) { this.error = json.message || '提交失败'; return; }
+        this.done = true;
+      } catch (e) {
+        this.error = e.message;
+      }
+    }
+  }
+}).mount('#publicWithdrawApp');
+</script>
+</body>
+</html>
