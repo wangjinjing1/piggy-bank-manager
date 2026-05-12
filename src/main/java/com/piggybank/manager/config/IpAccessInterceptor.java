@@ -17,6 +17,7 @@ public class IpAccessInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // 所有请求先过IP防刷，再进入登录态鉴权；被拉黑后直接返回429。
         String ip = clientIp(request);
         if (ipSecurityService.isBlacklisted(ip)) {
             response.setStatus(429);
@@ -29,6 +30,7 @@ public class IpAccessInterceptor implements HandlerInterceptor {
     }
 
     private String clientIp(HttpServletRequest request) {
+        // 部署在Nginx等反向代理后时优先读取代理传来的真实客户端IP。
         String forwarded = request.getHeader("X-Forwarded-For");
         if (StringUtils.hasText(forwarded)) {
             return forwarded.split(",")[0].trim();

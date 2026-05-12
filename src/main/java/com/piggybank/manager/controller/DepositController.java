@@ -47,11 +47,6 @@ public class DepositController {
         return ApiResponse.ok(depositService.detail(AuthContext.get().getId(), id, query.getPage(), query.getSize()));
     }
 
-    @PostMapping("/{id}/withdrawals")
-    public ApiResponse<?> withdraw(@PathVariable Long id, @Valid @RequestBody BillDtos.WithdrawalRequest request) {
-        return ApiResponse.ok(depositService.withdraw(AuthContext.get().getId(), id, request));
-    }
-
     @PostMapping("/withdrawals")
     public ApiResponse<?> withdrawByDepositor(@Valid @RequestBody BillDtos.WithdrawalRequest request) {
         return ApiResponse.ok(depositService.withdrawByDepositor(AuthContext.get().getId(), request));

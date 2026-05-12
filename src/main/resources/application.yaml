@@ -50,8 +50,8 @@ app:
     to: ${APP_STARTUP_MAIL_TO:}                 # 启动邮件接收人
   security:
     max-requests-per-ip-per-day: ${APP_SECURITY_MAX_REQUESTS_PER_IP_PER_DAY:200}
-    # 单IP每天最大请求次数限制，用于防刷
+    # 单IP每24小时最大请求次数限制，用于防刷；超过后自动加入IP黑名单
   admin:
     username: ${APP_ADMIN_USERNAME:admin}      # 管理员用户名
-    password: ${APP_ADMIN_PASSWORD:amdin}     # 管理员密码（注意默认值有拼写错误，应修正为 admin）
+    password: ${APP_ADMIN_PASSWORD:amdin1235dsfhsd5457432v..sdfsd}     # 管理员密码（注意默认值有拼写错误，应修正为 admin）
     email: ${APP_ADMIN_EMAIL:admin@example.com}  # 管理员邮箱

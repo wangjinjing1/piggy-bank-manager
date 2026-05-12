@@ -18,7 +18,10 @@ public class DatabaseInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        // 轻量部署场景下不依赖额外迁移工具，应用启动时保证核心表存在。
+        /*
+         * 轻量部署场景下不依赖额外迁移工具，应用启动时保证核心表存在。
+         * 新增字段用 addColumnIfMissing，废弃字段用 dropColumnIfExists，避免旧库升级时报错。
+         */
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS app_user (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -116,20 +119,6 @@ public class DatabaseInitializer implements ApplicationRunner {
         dropColumnIfExists("deposit_bill", "withdrawn_amount");
         dropColumnIfExists("deposit_bill", "remaining_amount");
         jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS deposit_withdrawal (
-                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                  deposit_bill_id BIGINT NOT NULL,
-                  owner_user_id BIGINT NOT NULL,
-                  depositor_name VARCHAR(120) NOT NULL,
-                  amount DECIMAL(18,2) NOT NULL,
-                  withdrawal_date DATE NOT NULL,
-                  remark VARCHAR(100),
-                  created_at DATETIME NOT NULL,
-                  INDEX idx_withdrawal_bill (deposit_bill_id),
-                  INDEX idx_withdrawal_owner (owner_user_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                """);
-        jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS ip_blacklist (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
                   ip VARCHAR(64) NOT NULL UNIQUE,
@@ -139,6 +128,17 @@ public class DatabaseInitializer implements ApplicationRunner {
                   created_at DATETIME NOT NULL,
                   updated_at DATETIME NOT NULL,
                   INDEX idx_ip_blacklist_date (blocked_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS ip_access_stat (
+                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                  ip VARCHAR(64) NOT NULL UNIQUE,
+                  request_count INT NOT NULL,
+                  window_start_at DATETIME NOT NULL,
+                  created_at DATETIME NOT NULL,
+                  updated_at DATETIME NOT NULL,
+                  INDEX idx_ip_access_window (window_start_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """);
         userService.ensureDefaultAdmin();

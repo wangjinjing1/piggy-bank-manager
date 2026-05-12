@@ -25,6 +25,7 @@ const formatDateTimeValue = (value) => {
   return time ? `${date} ${time}` : date;
 };
 
+// 单页应用的全部状态和页面动作都集中在这里，方便排查前端交互问题。
 Vue.createApp({
   data() {
     const today = new Date().toISOString().slice(0, 10);
@@ -33,7 +34,7 @@ Vue.createApp({
       me: JSON.parse(localStorage.getItem('me') || '{}'),
       view: 'borrow',
       titles: { borrow: '借账单', overdue: '逾期借条', deposit: '存账单', report: '统计导出', users: '用户管理', blacklist: 'IP 黑名单' },
-      error: '', notice: '',
+      error: '',
       showMessage: false, messageTitle: '', messageText: '', messageCopyText: '',
       loginForm: { username: '', password: '' },
       borrows: [], overdueGroups: [], deposits: [], users: [], blacklists: [],
@@ -79,7 +80,7 @@ Vue.createApp({
   },
   methods: {
     async run(fn) {
-      this.error = ''; this.notice = '';
+      this.error = '';
       try { return await fn(); } catch (e) { this.error = e.message; this.openMessage('提示', e.message || '操作失败'); }
     },
     async login() {
@@ -266,14 +267,12 @@ Vue.createApp({
     },
     async approveBorrow(id) { await this.run(async () => { await api(`/api/borrows/${id}/approve`, { method: 'PATCH', body: '{}' }); await this.loadBorrows(); }); },
     async setBorrowStatus(b, status) { await this.run(async () => { await api(`/api/borrows/${b.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); await this.loadBorrows(); }); },
-    async changeBorrowOwner(b) { await this.run(async () => { await api(`/api/borrows/${b.id}/owner`, { method: 'PATCH', body: JSON.stringify({ ownerUserId: b.ownerUserId }) }); await this.loadBorrows(); }); },
     async deleteBorrow(id) {
       if (!confirm('确认删除这条借账单吗？')) return;
       await this.run(async () => { await api(`/api/borrows/${id}`, { method: 'DELETE' }); await this.loadBorrows(); });
     },
     async sendOverdueReminder(email) { await this.run(async () => { await api('/api/borrows/overdue/remind', { method: 'POST', body: JSON.stringify({ email }) }); await this.loadOverdue(); }); },
     async setDepositStatus(d, status) { await this.run(async () => { await api(`/api/deposits/${d.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); await this.loadDeposits(); }); },
-    async changeDepositOwner(d) { await this.run(async () => { await api(`/api/deposits/${d.id}/owner`, { method: 'PATCH', body: JSON.stringify({ ownerUserId: d.ownerUserId }) }); await this.loadDeposits(); }); },
     async deleteDeposit(id) {
       if (!confirm('确认删除这条存账单吗？')) return;
       await this.run(async () => { await api(`/api/deposits/${id}`, { method: 'DELETE' }); await this.loadDeposits(); });

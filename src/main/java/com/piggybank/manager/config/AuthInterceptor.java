@@ -38,6 +38,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        // Tomcat工作线程会复用，请求结束必须清理ThreadLocal，避免串用户。
         AuthContext.clear();
     }
 }

@@ -95,6 +95,7 @@ public class BorrowService {
     }
 
     public BorrowBill sendAuditMail(Long ownerId, Long id) {
+        // 审核邮件允许在详情页手动补发，便于处理SMTP临时失败的情况。
         BorrowBill bill = getOwned(ownerId, id);
         if (!"APPROVED".equals(bill.getAuditStatus())) {
             throw new IllegalArgumentException("借账单未审核通过，不能发送审核邮件");
@@ -133,6 +134,7 @@ public class BorrowService {
 
     @Transactional
     public BorrowRepayment repay(Long ownerId, Long id, BillDtos.RepaymentRequest request) {
+        // 还款记录和借条已还/待还金额必须在同一个事务里更新，避免金额对不上。
         BorrowBill bill = getOwned(ownerId, id);
         BigDecimal amount = request.getAmount();
         BigDecimal remaining = bill.getRemainingAmount() == null ? bill.getAmount() : bill.getRemainingAmount();
@@ -324,6 +326,7 @@ public class BorrowService {
     }
 
     private void sendAuditApprovedMail(BorrowBill bill) {
+        // 成功后写空字符串而不是null，确保MyBatis-Plus会把旧错误信息清掉。
         try {
             mailService.send(bill.getEmail(), "借款审核已通过",
                     "您的借款信息已审核通过。"

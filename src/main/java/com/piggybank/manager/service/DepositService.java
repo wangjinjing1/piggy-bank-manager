@@ -2,15 +2,13 @@ package com.piggybank.manager.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.piggybank.manager.domain.DepositBill;
-import com.piggybank.manager.domain.DepositWithdrawal;
 import com.piggybank.manager.dto.BillDtos;
 import com.piggybank.manager.mapper.DepositBillMapper;
-import com.piggybank.manager.mapper.DepositWithdrawalMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -21,11 +19,9 @@ import org.springframework.util.StringUtils;
 public class DepositService {
     private static final LocalDate FAR_FUTURE = LocalDate.of(9999, 12, 31);
     private final DepositBillMapper depositMapper;
-    private final DepositWithdrawalMapper withdrawalMapper;
 
-    public DepositService(DepositBillMapper depositMapper, DepositWithdrawalMapper withdrawalMapper) {
+    public DepositService(DepositBillMapper depositMapper) {
         this.depositMapper = depositMapper;
-        this.withdrawalMapper = withdrawalMapper;
     }
 
     public DepositBill create(Long ownerId, BillDtos.DepositRequest request) {
@@ -86,26 +82,11 @@ public class DepositService {
     }
 
     @Transactional
-    public DepositWithdrawal withdraw(Long ownerId, Long id, BillDtos.WithdrawalRequest request) {
-        DepositBill bill = getOwned(ownerId, id);
-        if (request.getAmount().compareTo(bill.getAmount()) > 0) {
-            throw new IllegalArgumentException("存款余额不足，无法取款");
-        }
-        DepositWithdrawal withdrawal = new DepositWithdrawal();
-        withdrawal.setDepositBillId(id);
-        withdrawal.setOwnerUserId(ownerId);
-        withdrawal.setDepositorName(request.getDepositorName());
-        withdrawal.setAmount(request.getAmount());
-        withdrawal.setWithdrawalDate(request.getWithdrawalDate() == null ? LocalDate.now() : request.getWithdrawalDate());
-        withdrawal.setRemark(request.getRemark());
-        withdrawal.setCreatedAt(LocalDateTime.now());
-        withdrawalMapper.insert(withdrawal);
-
-        return withdrawal;
-    }
-
-    @Transactional
     public DepositBill withdrawByDepositor(Long ownerId, BillDtos.WithdrawalRequest request) {
+        /*
+         * 取钱不再维护单独流水表，而是写入一条负数存账单。
+         * 这样列表、统计、导出只需要汇总 deposit_bill.amount 就能得到真实余额。
+         */
         List<DepositBill> bills = depositMapper.selectList(new LambdaQueryWrapper<DepositBill>()
                 .eq(DepositBill::getOwnerUserId, ownerId)
                 .eq(DepositBill::getStatus, "NORMAL")
@@ -134,11 +115,8 @@ public class DepositService {
 
     public Map<String, Object> detail(Long ownerId, Long id, int page, int size) {
         DepositBill bill = getOwned(ownerId, id);
-        List<DepositWithdrawal> records = withdrawalMapper.selectList(new LambdaQueryWrapper<DepositWithdrawal>()
-                .eq(DepositWithdrawal::getDepositBillId, id)
-                .orderByDesc(DepositWithdrawal::getWithdrawalDate)
-                .orderByDesc(DepositWithdrawal::getCreatedAt));
-        return Map.of("bill", bill, "withdrawals", page(records, page, size));
+        // 存账单详情目前只展示单据本身；还款记录只属于借账单。
+        return Map.of("bill", bill, "records", page(List.of(), page, size));
     }
 
     public DepositBill updateOwner(Long id, Long ownerUserId) {
