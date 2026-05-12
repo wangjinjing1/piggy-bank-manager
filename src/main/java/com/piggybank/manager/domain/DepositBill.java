@@ -11,8 +11,6 @@ public class DepositBill {
     private Long ownerUserId;
     private String depositorName;
     private BigDecimal amount;
-    private BigDecimal withdrawnAmount;
-    private BigDecimal remainingAmount;
     private String bank;
     private LocalDate depositDate;
     private LocalDate dueDate;
@@ -29,10 +27,6 @@ public class DepositBill {
     public void setDepositorName(String depositorName) { this.depositorName = depositorName; }
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
-    public BigDecimal getWithdrawnAmount() { return withdrawnAmount; }
-    public void setWithdrawnAmount(BigDecimal withdrawnAmount) { this.withdrawnAmount = withdrawnAmount; }
-    public BigDecimal getRemainingAmount() { return remainingAmount; }
-    public void setRemainingAmount(BigDecimal remainingAmount) { this.remainingAmount = remainingAmount; }
     public String getBank() { return bank; }
     public void setBank(String bank) { this.bank = bank; }
     public LocalDate getDepositDate() { return depositDate; }

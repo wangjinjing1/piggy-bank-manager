@@ -94,6 +94,15 @@ public class BorrowService {
         return billMapper.selectById(id);
     }
 
+    public BorrowBill sendAuditMail(Long ownerId, Long id) {
+        BorrowBill bill = getOwned(ownerId, id);
+        if (!"APPROVED".equals(bill.getAuditStatus())) {
+            throw new IllegalArgumentException("借账单未审核通过，不能发送审核邮件");
+        }
+        sendAuditApprovedMail(bill);
+        return billMapper.selectById(id);
+    }
+
     public BorrowBill updateStatus(Long ownerId, Long id, String status) {
         BorrowBill bill = getOwned(ownerId, id);
         bill.setStatus(normalizeStatus(status));
@@ -323,7 +332,7 @@ public class BorrowService {
                             + "\n还款日期：" + DateFormatUtil.date(bill.getDueDate()));
             bill.setAuditMailStatus("SENT");
             bill.setAuditMailSentAt(LocalDateTime.now());
-            bill.setAuditMailError(null);
+            bill.setAuditMailError("");
         } catch (Exception ex) {
             bill.setAuditMailStatus("FAILED");
             bill.setAuditMailError(ex.getMessage());
@@ -336,7 +345,7 @@ public class BorrowService {
         for (BorrowBill bill : bills) {
             bill.setReminderMailStatus(status);
             bill.setReminderMailSentAt("SENT".equals(status) ? LocalDateTime.now() : bill.getReminderMailSentAt());
-            bill.setReminderMailError(error);
+            bill.setReminderMailError(error == null ? "" : error);
             bill.setUpdatedAt(LocalDateTime.now());
             billMapper.updateById(bill);
         }

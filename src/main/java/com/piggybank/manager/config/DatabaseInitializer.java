@@ -100,8 +100,6 @@ public class DatabaseInitializer implements ApplicationRunner {
                   owner_user_id BIGINT NOT NULL,
                   depositor_name VARCHAR(120) NOT NULL DEFAULT '',
                   amount DECIMAL(18,2) NOT NULL,
-                  withdrawn_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
-                  remaining_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
                   bank VARCHAR(120) NOT NULL,
                   deposit_date DATE NOT NULL,
                   due_date DATE NOT NULL,
@@ -114,10 +112,9 @@ public class DatabaseInitializer implements ApplicationRunner {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """);
         addColumnIfMissing("deposit_bill", "depositor_name", "VARCHAR(120) NOT NULL DEFAULT ''");
-        addColumnIfMissing("deposit_bill", "withdrawn_amount", "DECIMAL(18,2) NOT NULL DEFAULT 0");
-        addColumnIfMissing("deposit_bill", "remaining_amount", "DECIMAL(18,2) NOT NULL DEFAULT 0");
         addColumnIfMissing("deposit_bill", "remark", "VARCHAR(100)");
-        jdbcTemplate.execute("UPDATE deposit_bill SET remaining_amount = amount - withdrawn_amount WHERE remaining_amount = 0 AND amount > withdrawn_amount");
+        dropColumnIfExists("deposit_bill", "withdrawn_amount");
+        dropColumnIfExists("deposit_bill", "remaining_amount");
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS deposit_withdrawal (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -157,6 +154,19 @@ public class DatabaseInitializer implements ApplicationRunner {
                 """, Integer.class, tableName, columnName);
         if (count != null && count == 0) {
             jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
+        }
+    }
+
+    private void dropColumnIfExists(String tableName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                """, Integer.class, tableName, columnName);
+        if (count != null && count > 0) {
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " DROP COLUMN " + columnName);
         }
     }
 }

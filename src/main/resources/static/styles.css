@@ -33,6 +33,7 @@ input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px 
 .hint { color: var(--muted); }
 .error { color: var(--danger); }
 .success { color: var(--ok); overflow-wrap: anywhere; }
+.negative { color: var(--danger); }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 220px 1fr; }
 .sidebar { background: #10231f; color: #fff; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
 .sidebar h1 { font-size: 22px; margin-bottom: 16px; }
@@ -42,9 +43,11 @@ input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px 
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .topbar strong { display: block; font-size: 24px; }
 .topbar span { color: var(--muted); }
-.actions, .row-actions, .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.actions, .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row-actions { display: inline-flex; gap: 10px; flex-wrap: nowrap; align-items: center; min-width: max-content; }
+.row-actions button { flex: 0 0 auto; white-space: nowrap; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+table { width: max-content; min-width: 100%; border-collapse: collapse; }
 th, td { padding: 13px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; white-space: nowrap; }
 th { background: #eef2f6; font-weight: 650; color: #384255; }
 tbody tr:hover { background: #fafbfc; }
@@ -90,6 +93,7 @@ td small { display: block; color: var(--muted); margin-top: 4px; }
 .modal { position: relative; z-index: 21; width: min(560px, 100%); max-height: calc(100vh - 36px); overflow: auto; background: var(--panel); border-radius: 8px; padding: 24px; box-shadow: 0 20px 60px rgba(7, 15, 24, .22); }
 .wide-modal { width: min(900px, 100%); display: grid; gap: 14px; }
 .detail-summary { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); }
+.message-text { color: var(--text); line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
 .modal-actions { justify-content: flex-end; margin-top: 10px; }
 @media (max-width: 760px) {
   .app-shell { display: block; min-height: 100vh; }

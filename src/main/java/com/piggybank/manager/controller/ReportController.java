@@ -42,8 +42,8 @@ public class ReportController {
         String filename;
         if ("DEPOSIT".equalsIgnoreCase(query.getType())) {
             filename = "deposit-report.csv";
-            csv = "存款人,金额,已取金额,剩余金额,银行,存款日期,到期日期,状态,备注\n" + depositService.report(ownerId, query.getStartDate(), query.getEndDate(), query.getName()).stream()
-                    .map(b -> safe(b.getDepositorName()) + "," + b.getAmount() + "," + b.getWithdrawnAmount() + "," + b.getRemainingAmount() + "," + safe(b.getBank()) + "," + b.getDepositDate() + "," + b.getDueDate() + "," + statusText(b.getStatus()) + "," + safe(b.getRemark()))
+            csv = "存款人,金额,银行,存款日期,到期日期,状态,备注\n" + depositService.report(ownerId, query.getStartDate(), query.getEndDate(), query.getName()).stream()
+                    .map(b -> safe(b.getDepositorName()) + "," + b.getAmount() + "," + safe(b.getBank()) + "," + b.getDepositDate() + "," + b.getDueDate() + "," + statusText(b.getStatus()) + "," + safe(b.getRemark()))
                     .reduce("", (a, b) -> a + b + "\n");
         } else {
             filename = "borrow-report.csv";

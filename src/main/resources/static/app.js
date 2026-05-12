@@ -34,6 +34,7 @@ Vue.createApp({
       view: 'borrow',
       titles: { borrow: '借账单', overdue: '逾期借条', deposit: '存账单', report: '统计导出', users: '用户管理', blacklist: 'IP 黑名单' },
       error: '', notice: '',
+      showMessage: false, messageTitle: '', messageText: '', messageCopyText: '',
       loginForm: { username: '', password: '' },
       borrows: [], overdueGroups: [], deposits: [], users: [], blacklists: [],
       borrowPage: { page: 1, size: 5, total: 0 },
@@ -45,9 +46,9 @@ Vue.createApp({
       detailType: 'BORROW',
       detailPage: 1,
       detail: {},
-      borrowForm: { id: null, borrowerName: '', status: 'NORMAL', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31', remark: '' },
+      borrowForm: { id: null, ownerUserId: null, borrowerName: '', status: 'NORMAL', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31', remark: '' },
       repayForm: { amount: null, repaymentDate: today, remark: '' },
-      depositForm: { id: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: today, status: 'NORMAL', remark: '' },
+      depositForm: { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: today, status: 'NORMAL', remark: '' },
       withdrawForm: { depositorName: '', amount: null, withdrawalDate: today, remark: '' },
       userForm: { userId: null, username: '', password: '', email: '' },
       reportQuery: { type: 'BORROW', startDate: '', endDate: '9999-12-31', name: '', page: 1, size: 10 },
@@ -79,7 +80,7 @@ Vue.createApp({
   methods: {
     async run(fn) {
       this.error = ''; this.notice = '';
-      try { return await fn(); } catch (e) { this.error = e.message; }
+      try { return await fn(); } catch (e) { this.error = e.message; this.openMessage('提示', e.message || '操作失败'); }
     },
     async login() {
       await this.run(async () => {
@@ -136,6 +137,7 @@ Vue.createApp({
       this.borrowForm = borrow
         ? {
             id: borrow.id,
+            ownerUserId: borrow.ownerUserId,
             borrowerName: borrow.borrowerName,
             status: borrow.status,
             phone: borrow.phone,
@@ -145,7 +147,7 @@ Vue.createApp({
             dueDate: String(borrow.dueDate || '9999-12-31').slice(0, 10),
             remark: borrow.remark || ''
           }
-        : { id: null, borrowerName: '', status: 'NORMAL', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31', remark: '' };
+        : { id: null, ownerUserId: null, borrowerName: '', status: 'NORMAL', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31', remark: '' };
       this.showBorrow = true;
     },
     openDeposit(deposit) {
@@ -153,6 +155,7 @@ Vue.createApp({
       this.depositForm = deposit
         ? {
             id: deposit.id,
+            ownerUserId: deposit.ownerUserId,
             depositorName: deposit.depositorName,
             amount: deposit.amount,
             bank: deposit.bank,
@@ -161,7 +164,7 @@ Vue.createApp({
             status: deposit.status,
             remark: deposit.remark || ''
           }
-        : { id: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: today, status: 'NORMAL', remark: '' };
+        : { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: today, status: 'NORMAL', remark: '' };
       this.showDeposit = true;
     },
     openUser(user) {
@@ -172,18 +175,28 @@ Vue.createApp({
     },
     async saveBorrow() {
       await this.run(async () => {
-        const body = { ...this.borrowForm, dueDate: this.borrowForm.dueDate || null };
-        const url = this.borrowForm.id ? `/api/borrows/${this.borrowForm.id}` : '/api/borrows';
-        const method = this.borrowForm.id ? 'PUT' : 'POST';
+        const isEdit = !!this.borrowForm.id;
+        const { ownerUserId, ...form } = this.borrowForm;
+        const body = { ...form, dueDate: this.borrowForm.dueDate || null };
+        const url = isEdit ? `/api/borrows/${this.borrowForm.id}` : '/api/borrows';
+        const method = isEdit ? 'PUT' : 'POST';
         await api(url, { method, body: JSON.stringify(body) });
+        if (isEdit && this.me.role === 'ADMIN' && this.borrowForm.ownerUserId) {
+          await api(`/api/borrows/${this.borrowForm.id}/owner`, { method: 'PATCH', body: JSON.stringify({ ownerUserId: this.borrowForm.ownerUserId }) });
+        }
         this.showBorrow = false; await this.loadBorrows();
       });
     },
     async saveDeposit() {
       await this.run(async () => {
-        const url = this.depositForm.id ? `/api/deposits/${this.depositForm.id}` : '/api/deposits';
-        const method = this.depositForm.id ? 'PUT' : 'POST';
-        await api(url, { method, body: JSON.stringify(this.depositForm) });
+        const isEdit = !!this.depositForm.id;
+        const url = isEdit ? `/api/deposits/${this.depositForm.id}` : '/api/deposits';
+        const method = isEdit ? 'PUT' : 'POST';
+        const { ownerUserId, ...body } = this.depositForm;
+        await api(url, { method, body: JSON.stringify(body) });
+        if (isEdit && this.me.role === 'ADMIN' && this.depositForm.ownerUserId) {
+          await api(`/api/deposits/${this.depositForm.id}/owner`, { method: 'PATCH', body: JSON.stringify({ ownerUserId: this.depositForm.ownerUserId }) });
+        }
         this.showDeposit = false; await this.loadDeposits();
       });
     },
@@ -200,17 +213,18 @@ Vue.createApp({
         await this.loadBorrows();
       });
     },
-    openWithdraw(bill) {
+    openWithdraw() {
       const today = new Date().toISOString().slice(0, 10);
-      this.activeBill = bill;
-      this.withdrawForm = { depositorName: bill.depositorName || '', amount: null, withdrawalDate: today, remark: '' };
+      this.activeBill = null;
+      this.withdrawForm = { depositorName: '', amount: null, withdrawalDate: today, remark: '' };
       this.showWithdraw = true;
     },
     async saveWithdraw() {
       await this.run(async () => {
-        await api(`/api/deposits/${this.activeBill.id}/withdrawals`, { method: 'POST', body: JSON.stringify(this.withdrawForm) });
+        await api('/api/deposits/withdrawals', { method: 'POST', body: JSON.stringify(this.withdrawForm) });
         this.showWithdraw = false;
         await this.loadDeposits();
+        this.openMessage('操作成功', '取钱已保存，并新增一条负数存账单记录');
       });
     },
     async saveUser() {
@@ -232,8 +246,23 @@ Vue.createApp({
     async createLink() {
       await this.run(async () => {
         const data = await api('/api/borrows/links', { method: 'POST', body: '{}' });
-        this.notice = `匿名填写链接：${data.url}`;
+        this.openMessage('匿名填写链接', data.url, data.url);
       });
+    },
+    openMessage(title, text, copyText = '') {
+      this.messageTitle = title;
+      this.messageText = text;
+      this.messageCopyText = copyText;
+      this.showMessage = true;
+    },
+    async copyMessage() {
+      if (!this.messageCopyText) return;
+      try {
+        await navigator.clipboard.writeText(this.messageCopyText);
+        this.messageTitle = '已复制';
+      } catch (e) {
+        this.messageTitle = '复制失败';
+      }
     },
     async approveBorrow(id) { await this.run(async () => { await api(`/api/borrows/${id}/approve`, { method: 'PATCH', body: '{}' }); await this.loadBorrows(); }); },
     async setBorrowStatus(b, status) { await this.run(async () => { await api(`/api/borrows/${b.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); await this.loadBorrows(); }); },
@@ -302,6 +331,13 @@ Vue.createApp({
         await this.loadBorrows();
       });
     },
+    async sendAuditMailFromDetail() {
+      if (!this.detail.bill?.id) return;
+      await this.run(async () => {
+        this.detail.bill = await api(`/api/borrows/${this.detail.bill.id}/audit-mail`, { method: 'POST', body: '{}' });
+        await this.loadBorrows();
+      });
+    },
     async changeDetailPage(delta) {
       const pageData = this.detailPageData;
       const next = this.detailPage + delta;
@@ -323,6 +359,11 @@ Vue.createApp({
       });
     },
     money(v) { return Number(v || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' }); },
+    usernameById(id) {
+      if (!id) return '-';
+      if (Number(id) === Number(this.me.userId)) return this.me.username || '-';
+      return (this.users.find((user) => Number(user.userId) === Number(id)) || {}).username || `用户 ${id}`;
+    },
     pageCount(total, size) { return Math.max(Math.ceil(Number(total || 0) / Number(size || 10)), 1); },
     formatDate(v) { return formatDateValue(v); },
     formatDateTime(v) { return formatDateTimeValue(v); },

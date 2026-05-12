@@ -79,6 +79,11 @@ public class BorrowController {
         return ApiResponse.ok(borrowService.approve(AuthContext.get().getId(), id));
     }
 
+    @PostMapping("/{id}/audit-mail")
+    public ApiResponse<?> auditMail(@PathVariable Long id) {
+        return ApiResponse.ok(borrowService.sendAuditMail(AuthContext.get().getId(), id));
+    }
+
     @PatchMapping("/{id}/status")
     public ApiResponse<?> status(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return ApiResponse.ok(borrowService.updateStatus(AuthContext.get().getId(), id, body.get("status")));

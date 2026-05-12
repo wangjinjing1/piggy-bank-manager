@@ -33,8 +33,6 @@ public class DepositService {
         bill.setOwnerUserId(ownerId);
         bill.setDepositorName(request.getDepositorName());
         bill.setAmount(request.getAmount());
-        bill.setWithdrawnAmount(BigDecimal.ZERO);
-        bill.setRemainingAmount(request.getAmount());
         bill.setBank(request.getBank());
         bill.setDepositDate(request.getDepositDate() == null ? LocalDate.now() : request.getDepositDate());
         bill.setDueDate(request.getDueDate());
@@ -77,11 +75,6 @@ public class DepositService {
         DepositBill bill = getOwned(ownerId, id);
         bill.setDepositorName(request.getDepositorName());
         bill.setAmount(request.getAmount());
-        BigDecimal withdrawn = bill.getWithdrawnAmount() == null ? BigDecimal.ZERO : bill.getWithdrawnAmount();
-        if (request.getAmount().compareTo(withdrawn) < 0) {
-            throw new IllegalArgumentException("存款金额不能小于已取金额");
-        }
-        bill.setRemainingAmount(request.getAmount().subtract(withdrawn));
         bill.setBank(request.getBank());
         bill.setDepositDate(request.getDepositDate() == null ? LocalDate.now() : request.getDepositDate());
         bill.setDueDate(request.getDueDate());
@@ -95,8 +88,7 @@ public class DepositService {
     @Transactional
     public DepositWithdrawal withdraw(Long ownerId, Long id, BillDtos.WithdrawalRequest request) {
         DepositBill bill = getOwned(ownerId, id);
-        BigDecimal remaining = bill.getRemainingAmount() == null ? bill.getAmount() : bill.getRemainingAmount();
-        if (request.getAmount().compareTo(remaining) > 0) {
+        if (request.getAmount().compareTo(bill.getAmount()) > 0) {
             throw new IllegalArgumentException("存款余额不足，无法取款");
         }
         DepositWithdrawal withdrawal = new DepositWithdrawal();
@@ -109,12 +101,35 @@ public class DepositService {
         withdrawal.setCreatedAt(LocalDateTime.now());
         withdrawalMapper.insert(withdrawal);
 
-        BigDecimal withdrawn = bill.getWithdrawnAmount() == null ? BigDecimal.ZERO : bill.getWithdrawnAmount();
-        bill.setWithdrawnAmount(withdrawn.add(request.getAmount()));
-        bill.setRemainingAmount(remaining.subtract(request.getAmount()));
-        bill.setUpdatedAt(LocalDateTime.now());
-        depositMapper.updateById(bill);
         return withdrawal;
+    }
+
+    @Transactional
+    public DepositBill withdrawByDepositor(Long ownerId, BillDtos.WithdrawalRequest request) {
+        List<DepositBill> bills = depositMapper.selectList(new LambdaQueryWrapper<DepositBill>()
+                .eq(DepositBill::getOwnerUserId, ownerId)
+                .eq(DepositBill::getStatus, "NORMAL")
+                .eq(DepositBill::getDepositorName, request.getDepositorName()));
+        BigDecimal available = bills.stream()
+                .map(DepositBill::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (request.getAmount().compareTo(available) > 0) {
+            throw new IllegalArgumentException("可用余额不足，目前可用余额为" + available);
+        }
+
+        DepositBill bill = new DepositBill();
+        bill.setOwnerUserId(ownerId);
+        bill.setDepositorName(request.getDepositorName());
+        bill.setAmount(request.getAmount().negate());
+        bill.setBank("取钱");
+        bill.setDepositDate(request.getWithdrawalDate() == null ? LocalDate.now() : request.getWithdrawalDate());
+        bill.setDueDate(request.getWithdrawalDate() == null ? LocalDate.now() : request.getWithdrawalDate());
+        bill.setStatus("NORMAL");
+        bill.setRemark(request.getRemark());
+        bill.setCreatedAt(LocalDateTime.now());
+        bill.setUpdatedAt(LocalDateTime.now());
+        depositMapper.insert(bill);
+        return bill;
     }
 
     public Map<String, Object> detail(Long ownerId, Long id, int page, int size) {
@@ -156,7 +171,7 @@ public class DepositService {
     }
 
     public BigDecimal sum(List<DepositBill> bills) {
-        return bills.stream().map(b -> b.getRemainingAmount() == null ? b.getAmount() : b.getRemainingAmount()).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return bills.stream().map(DepositBill::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public Map<String, Object> reportGroups(Long ownerId, LocalDate start, LocalDate end, String name, int page, int size) {
@@ -182,6 +197,7 @@ public class DepositService {
     public List<DepositBill> dueBills() {
         return depositMapper.selectList(new LambdaQueryWrapper<DepositBill>()
                 .eq(DepositBill::getStatus, "NORMAL")
+                .gt(DepositBill::getAmount, BigDecimal.ZERO)
                 .le(DepositBill::getDueDate, LocalDate.now()));
     }
 
