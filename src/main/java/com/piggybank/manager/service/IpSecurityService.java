@@ -2,23 +2,25 @@ package com.piggybank.manager.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.piggybank.manager.config.AppProperties;
-import com.piggybank.manager.domain.IpAccessStat;
 import com.piggybank.manager.domain.IpBlacklist;
-import com.piggybank.manager.mapper.IpAccessStatMapper;
 import com.piggybank.manager.mapper.IpBlacklistMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 public class IpSecurityService {
-    private final IpAccessStatMapper accessStatMapper;
+    private static final String ACCESS_COUNTER_PREFIX = "security:ip:access:";
+    private static final Duration ACCESS_WINDOW = Duration.ofHours(24);
+    private final StringRedisTemplate redisTemplate;
     private final IpBlacklistMapper blacklistMapper;
     private final AppProperties properties;
 
-    public IpSecurityService(IpAccessStatMapper accessStatMapper, IpBlacklistMapper blacklistMapper, AppProperties properties) {
-        this.accessStatMapper = accessStatMapper;
+    public IpSecurityService(StringRedisTemplate redisTemplate, IpBlacklistMapper blacklistMapper, AppProperties properties) {
+        this.redisTemplate = redisTemplate;
         this.blacklistMapper = blacklistMapper;
         this.properties = properties;
     }
@@ -28,34 +30,16 @@ public class IpSecurityService {
     }
 
     /*
-     * 每个IP维护一个独立的24小时访问窗口。
-     * 窗口过期后重置计数；窗口内超过配置阈值后写入黑名单表。
+     * 每个IP维护一个独立的Redis计数键。
+     * 每次访问都会把TTL续到24小时；连续24小时无访问时键自动过期，减少Redis占用。
+     * 计数超过配置阈值后写入MySQL黑名单表，黑名单仍然只允许管理员手动解除。
      */
-    public synchronized void recordVisit(String ip) {
-        LocalDateTime now = LocalDateTime.now();
-        IpAccessStat stat = accessStatMapper.selectOne(new LambdaQueryWrapper<IpAccessStat>().eq(IpAccessStat::getIp, ip));
-        if (stat == null) {
-            stat = new IpAccessStat();
-            stat.setIp(ip);
-            stat.setRequestCount(1);
-            stat.setWindowStartAt(now);
-            stat.setCreatedAt(now);
-            stat.setUpdatedAt(now);
-            accessStatMapper.insert(stat);
-            return;
-        }
-
-        if (stat.getWindowStartAt() == null || !now.isBefore(stat.getWindowStartAt().plusHours(24))) {
-            stat.setRequestCount(1);
-            stat.setWindowStartAt(now);
-        } else {
-            stat.setRequestCount((stat.getRequestCount() == null ? 0 : stat.getRequestCount()) + 1);
-        }
-        stat.setUpdatedAt(now);
-        accessStatMapper.updateById(stat);
-
-        if (stat.getRequestCount() > properties.getSecurity().getMaxRequestsPerIpPerDay()) {
-            addBlacklist(ip, "24小时内访问次数超过限制", stat.getRequestCount());
+    public void recordVisit(String ip) {
+        String key = accessCounterKey(ip);
+        Long count = redisTemplate.opsForValue().increment(key);
+        redisTemplate.expire(key, ACCESS_WINDOW);
+        if (count != null && count > properties.getSecurity().getMaxRequestsPerIpPerDay()) {
+            addBlacklist(ip, "24小时内访问次数超过限制", count.intValue());
         }
     }
 
@@ -68,8 +52,12 @@ public class IpSecurityService {
         IpBlacklist item = blacklistMapper.selectById(id);
         blacklistMapper.deleteById(id);
         if (item != null) {
-            accessStatMapper.delete(new LambdaQueryWrapper<IpAccessStat>().eq(IpAccessStat::getIp, item.getIp()));
+            redisTemplate.delete(accessCounterKey(item.getIp()));
         }
+    }
+
+    private String accessCounterKey(String ip) {
+        return ACCESS_COUNTER_PREFIX + ip;
     }
 
     private void addBlacklist(String ip, String reason, int count) {

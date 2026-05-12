@@ -130,17 +130,8 @@ public class DatabaseInitializer implements ApplicationRunner {
                   INDEX idx_ip_blacklist_date (blocked_date)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS ip_access_stat (
-                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                  ip VARCHAR(64) NOT NULL UNIQUE,
-                  request_count INT NOT NULL,
-                  window_start_at DATETIME NOT NULL,
-                  created_at DATETIME NOT NULL,
-                  updated_at DATETIME NOT NULL,
-                  INDEX idx_ip_access_window (window_start_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                """);
+        // IP访问计数已迁移到Redis，旧表在升级启动时移除，数据库只保留黑名单结果。
+        jdbcTemplate.execute("DROP TABLE IF EXISTS ip_access_stat");
         userService.ensureDefaultAdmin();
     }
 

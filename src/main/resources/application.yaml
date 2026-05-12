@@ -28,6 +28,14 @@ spring:
           timeout: 5000                         # 邮件发送超时（毫秒）
           connectiontimeout: 5000               # 连接超时（毫秒）
           writetimeout: 5000                    # 写操作超时（毫秒）
+  data:
+    redis:
+      # IP访问计数存放在Redis；Docker部署时可通过 .env 或容器环境变量覆盖。
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      database: ${SPRING_DATA_REDIS_DATABASE:0}
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:3000ms}
 
 mybatis-plus:
   configuration:
