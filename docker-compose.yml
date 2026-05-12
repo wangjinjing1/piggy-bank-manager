@@ -10,16 +10,5 @@ services:
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Duser.timezone=Asia/Shanghai}
-      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST:-piggy-bank-redis}
-      SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT:-6379}
-      SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD:-}
-      SPRING_DATA_REDIS_DATABASE: ${SPRING_DATA_REDIS_DATABASE:-0}
-    depends_on:
-      - piggy-bank-redis
     ports:
       - "8080:8080"
-
-  piggy-bank-redis:
-    container_name: piggy-bank-redis
-    image: redis:7-alpine
-    restart: unless-stopped
