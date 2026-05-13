@@ -41,11 +41,14 @@ public class DepositService {
         DepositBill bill = new DepositBill();
         bill.setOwnerUserId(ownerId);
         bill.setDepositorName(request.getDepositorName());
+        bill.setBillType("DEPOSIT");
         bill.setAmount(request.getAmount());
         bill.setBank(request.getBank());
         bill.setDepositDate(request.getDepositDate() == null ? LocalDate.now() : request.getDepositDate());
         bill.setDueDate(request.getDueDate() == null ? FAR_FUTURE : request.getDueDate());
         bill.setStatus(normalizeStatus(request.getStatus()));
+        bill.setSourceType("MANUAL");
+        bill.setAuditStatus("APPROVED");
         bill.setRemark(request.getRemark());
         bill.setCreatedAt(LocalDateTime.now());
         bill.setUpdatedAt(LocalDateTime.now());
@@ -82,10 +85,10 @@ public class DepositService {
 
     public DepositBill update(Long ownerId, Long id, BillDtos.DepositRequest request) {
         DepositBill bill = getOwned(ownerId, id);
-        if (request.getAmount().compareTo(BigDecimal.ZERO) == 0) {
-            throw new IllegalArgumentException("金额不能为0");
-        }
+        String billType = normalizeBillType(bill);
+        validateBillAmount(billType, request.getAmount());
         bill.setDepositorName(request.getDepositorName());
+        bill.setBillType(billType);
         bill.setAmount(request.getAmount());
         bill.setBank(request.getBank());
         bill.setDepositDate(request.getDepositDate() == null ? LocalDate.now() : request.getDepositDate());
@@ -103,30 +106,8 @@ public class DepositService {
          * 取钱不再维护单独流水表，而是写入一条负数存账单。
          * 这样列表、统计、导出只需要汇总 deposit_bill.amount 就能得到真实余额。
          */
-        List<DepositBill> bills = depositMapper.selectList(new LambdaQueryWrapper<DepositBill>()
-                .eq(DepositBill::getOwnerUserId, ownerId)
-                .eq(DepositBill::getStatus, "NORMAL")
-                .eq(DepositBill::getDepositorName, request.getDepositorName()));
-        BigDecimal available = bills.stream()
-                .map(DepositBill::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (request.getAmount().compareTo(available) > 0) {
-            throw new IllegalArgumentException("可用余额不足，目前可用余额为" + available);
-        }
-
-        DepositBill bill = new DepositBill();
-        bill.setOwnerUserId(ownerId);
-        bill.setDepositorName(request.getDepositorName());
-        bill.setAmount(request.getAmount().negate());
-        bill.setBank("取钱");
-        bill.setDepositDate(request.getWithdrawalDate() == null ? LocalDate.now() : request.getWithdrawalDate());
-        bill.setDueDate(request.getWithdrawalDate() == null ? LocalDate.now() : request.getWithdrawalDate());
-        bill.setStatus("NORMAL");
-        bill.setRemark(request.getRemark());
-        bill.setCreatedAt(LocalDateTime.now());
-        bill.setUpdatedAt(LocalDateTime.now());
-        depositMapper.insert(bill);
-        return bill;
+        ensureWithdrawalBalance(ownerId, request);
+        return createWithdrawalBill(ownerId, request, "MANUAL", "APPROVED");
     }
 
     public String createWithdrawalLink(Long ownerId) {
@@ -156,7 +137,9 @@ public class DepositService {
         if (link == null || Boolean.TRUE.equals(link.getUsed())) {
             throw new IllegalStateException("链接不存在或已被使用");
         }
-        DepositBill bill = withdrawByDepositor(link.getOwnerUserId(), request);
+        ensureWithdrawalBalance(link.getOwnerUserId(), request);
+        // 匿名取钱只创建待审核负数存账单，审核通过后才参与余额与统计。
+        DepositBill bill = createWithdrawalBill(link.getOwnerUserId(), request, "LINK", "PENDING");
         link.setUsed(true);
         link.setSubmittedBillId(bill.getId());
         link.setUsedAt(LocalDateTime.now());
@@ -193,6 +176,7 @@ public class DepositService {
         return depositMapper.selectList(new LambdaQueryWrapper<DepositBill>()
                 .eq(DepositBill::getOwnerUserId, ownerId)
                 .eq(DepositBill::getStatus, "NORMAL")
+                .eq(DepositBill::getAuditStatus, "APPROVED")
                 .ge(start != null, DepositBill::getDepositDate, start)
                 .le(DepositBill::getDepositDate, end == null ? FAR_FUTURE : end)
                 .like(StringUtils.hasText(name), DepositBill::getDepositorName, name)
@@ -226,6 +210,7 @@ public class DepositService {
     public List<DepositBill> dueBills() {
         return depositMapper.selectList(new LambdaQueryWrapper<DepositBill>()
                 .eq(DepositBill::getStatus, "NORMAL")
+                .eq(DepositBill::getAuditStatus, "APPROVED")
                 .gt(DepositBill::getAmount, BigDecimal.ZERO)
                 .le(DepositBill::getDueDate, LocalDate.now()));
     }
@@ -240,6 +225,79 @@ public class DepositService {
 
     private String normalizeStatus(String status) {
         return "VOID".equalsIgnoreCase(status) ? "VOID" : "NORMAL";
+    }
+
+    public DepositBill approveWithdrawal(Long ownerId, Long id) {
+        DepositBill bill = getOwned(ownerId, id);
+        if (!"PENDING".equals(bill.getAuditStatus()) || bill.getAmount() == null || bill.getAmount().compareTo(BigDecimal.ZERO) >= 0) {
+            throw new IllegalArgumentException("该记录不是待审核取钱单");
+        }
+        BillDtos.WithdrawalRequest request = new BillDtos.WithdrawalRequest();
+        request.setDepositorName(bill.getDepositorName());
+        request.setAmount(bill.getAmount().abs());
+        request.setWithdrawalDate(bill.getDepositDate());
+        request.setRemark(bill.getRemark());
+        ensureWithdrawalBalance(ownerId, request);
+        bill.setAuditStatus("APPROVED");
+        bill.setUpdatedAt(LocalDateTime.now());
+        depositMapper.updateById(bill);
+        return bill;
+    }
+
+    private void ensureWithdrawalBalance(Long ownerId, BillDtos.WithdrawalRequest request) {
+        BigDecimal available = approvedBalance(ownerId, request.getDepositorName());
+        if (request.getAmount().compareTo(available) > 0) {
+            throw new IllegalArgumentException("可用余额不足，目前可用余额为" + available);
+        }
+    }
+
+    private BigDecimal approvedBalance(Long ownerId, String depositorName) {
+        return depositMapper.selectList(new LambdaQueryWrapper<DepositBill>()
+                        .eq(DepositBill::getOwnerUserId, ownerId)
+                        .eq(DepositBill::getStatus, "NORMAL")
+                        .eq(DepositBill::getAuditStatus, "APPROVED")
+                        .eq(DepositBill::getDepositorName, depositorName))
+                .stream()
+                .map(DepositBill::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private DepositBill createWithdrawalBill(Long ownerId, BillDtos.WithdrawalRequest request, String sourceType, String auditStatus) {
+        DepositBill bill = new DepositBill();
+        bill.setOwnerUserId(ownerId);
+        bill.setDepositorName(request.getDepositorName());
+        bill.setBillType("WITHDRAW");
+        bill.setAmount(request.getAmount().negate());
+        bill.setBank("取钱");
+        bill.setDepositDate(request.getWithdrawalDate() == null ? LocalDate.now() : request.getWithdrawalDate());
+        bill.setDueDate(request.getWithdrawalDate() == null ? LocalDate.now() : request.getWithdrawalDate());
+        bill.setStatus("NORMAL");
+        bill.setSourceType(sourceType);
+        bill.setAuditStatus(auditStatus);
+        bill.setRemark(request.getRemark());
+        bill.setCreatedAt(LocalDateTime.now());
+        bill.setUpdatedAt(LocalDateTime.now());
+        depositMapper.insert(bill);
+        return bill;
+    }
+
+    private String normalizeBillType(DepositBill bill) {
+        if ("WITHDRAW".equalsIgnoreCase(bill.getBillType()) || bill.getAmount() != null && bill.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+            return "WITHDRAW";
+        }
+        return "DEPOSIT";
+    }
+
+    private void validateBillAmount(String billType, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) == 0) {
+            throw new IllegalArgumentException("金额不能为0");
+        }
+        if ("DEPOSIT".equals(billType) && amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("存款金额不能为负数");
+        }
+        if ("WITHDRAW".equals(billType) && amount.compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("取钱金额必须为负数");
+        }
     }
 
     private <T> Map<String, Object> page(List<T> items, int page, int size) {

@@ -114,11 +114,14 @@ public class DatabaseInitializer implements ApplicationRunner {
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
                   owner_user_id BIGINT NOT NULL,
                   depositor_name VARCHAR(120) NOT NULL DEFAULT '',
+                  bill_type VARCHAR(32) NOT NULL DEFAULT 'DEPOSIT',
                   amount DECIMAL(18,2) NOT NULL,
                   bank VARCHAR(120) NOT NULL,
                   deposit_date DATE NOT NULL,
                   due_date DATE NOT NULL,
                   status VARCHAR(32) NOT NULL,
+                  source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL',
+                  audit_status VARCHAR(32) NOT NULL DEFAULT 'APPROVED',
                   remark VARCHAR(100),
                   created_at DATETIME NOT NULL,
                   updated_at DATETIME NOT NULL,
@@ -127,7 +130,11 @@ public class DatabaseInitializer implements ApplicationRunner {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """);
         addColumnIfMissing("deposit_bill", "depositor_name", "VARCHAR(120) NOT NULL DEFAULT ''");
+        addColumnIfMissing("deposit_bill", "bill_type", "VARCHAR(32) NOT NULL DEFAULT 'DEPOSIT'");
+        addColumnIfMissing("deposit_bill", "source_type", "VARCHAR(32) NOT NULL DEFAULT 'MANUAL'");
+        addColumnIfMissing("deposit_bill", "audit_status", "VARCHAR(32) NOT NULL DEFAULT 'APPROVED'");
         addColumnIfMissing("deposit_bill", "remark", "VARCHAR(100)");
+        jdbcTemplate.execute("UPDATE deposit_bill SET bill_type = 'WITHDRAW' WHERE amount < 0 AND bill_type = 'DEPOSIT'");
         dropColumnIfExists("deposit_bill", "withdrawn_amount");
         dropColumnIfExists("deposit_bill", "remaining_amount");
         jdbcTemplate.execute("""

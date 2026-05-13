@@ -49,7 +49,7 @@ Vue.createApp({
       detail: {},
       borrowForm: { id: null, ownerUserId: null, borrowerName: '', status: 'NORMAL', phone: '', email: '', amount: null, borrowDate: today, dueDate: '9999-12-31', remark: '' },
       repayForm: { amount: null, repaymentDate: today, remark: '' },
-      depositForm: { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: '9999-12-31', status: 'NORMAL', remark: '' },
+      depositForm: { id: null, ownerUserId: null, depositorName: '', billType: 'DEPOSIT', amount: null, bank: '', depositDate: today, dueDate: '9999-12-31', status: 'NORMAL', remark: '' },
       withdrawForm: { depositorName: '', amount: null, withdrawalDate: today, remark: '' },
       userForm: { userId: null, username: '', password: '', email: '' },
       reportQuery: { type: 'BORROW', startDate: '', endDate: '9999-12-31', name: '', page: 1, size: 10 },
@@ -158,6 +158,7 @@ Vue.createApp({
             id: deposit.id,
             ownerUserId: deposit.ownerUserId,
             depositorName: deposit.depositorName,
+            billType: deposit.billType || (Number(deposit.amount) < 0 ? 'WITHDRAW' : 'DEPOSIT'),
             amount: deposit.amount,
             bank: deposit.bank,
             depositDate: String(deposit.depositDate || today).slice(0, 10),
@@ -165,7 +166,7 @@ Vue.createApp({
             status: deposit.status,
             remark: deposit.remark || ''
           }
-        : { id: null, ownerUserId: null, depositorName: '', amount: null, bank: '', depositDate: today, dueDate: '9999-12-31', status: 'NORMAL', remark: '' };
+        : { id: null, ownerUserId: null, depositorName: '', billType: 'DEPOSIT', amount: null, bank: '', depositDate: today, dueDate: '9999-12-31', status: 'NORMAL', remark: '' };
       this.showDeposit = true;
     },
     openUser(user) {
@@ -278,6 +279,7 @@ Vue.createApp({
       await this.run(async () => { await api(`/api/borrows/${id}`, { method: 'DELETE' }); await this.loadBorrows(); });
     },
     async sendOverdueReminder(email) { await this.run(async () => { await api('/api/borrows/overdue/remind', { method: 'POST', body: JSON.stringify({ email }) }); await this.loadOverdue(); }); },
+    async approveWithdrawal(id) { await this.run(async () => { await api(`/api/deposits/${id}/approve-withdrawal`, { method: 'PATCH', body: '{}' }); await this.loadDeposits(); }); },
     async setDepositStatus(d, status) { await this.run(async () => { await api(`/api/deposits/${d.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); await this.loadDeposits(); }); },
     async deleteDeposit(id) {
       if (!confirm('确认删除这条存账单吗？')) return;
@@ -373,6 +375,7 @@ Vue.createApp({
     formatDate(v) { return formatDateValue(v); },
     formatDateTime(v) { return formatDateTimeValue(v); },
     statusText(s) { return s === 'VOID' ? '作废' : '正常'; },
+    depositBillTypeText(type, amount) { return type === 'WITHDRAW' || Number(amount) < 0 ? '取钱' : '存钱'; },
     auditText(s) { return ({ APPROVED: '已通过', PENDING: '待审核', REJECTED: '已拒绝' })[s] || s; },
     mailStatusText(s) { return ({ NOT_SENT: '未发送', SENT: '已发送', FAILED: '发送失败' })[s] || '未发送'; }
   }

@@ -136,20 +136,22 @@
         </form>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>存款人</th><th>银行</th><th>存款金额</th><th>存款日</th><th>状态</th><th>操作</th></tr></thead>
+            <thead><tr><th>存款人</th><th>类型</th><th>银行</th><th>存款金额</th><th>存款日</th><th>状态</th><th>操作</th></tr></thead>
             <tbody>
             <tr v-for="d in deposits" :key="d.id">
               <td>{{ d.depositorName }}</td>
+              <td>{{ depositBillTypeText(d.billType, d.amount) }}</td>
               <td>{{ d.bank }}</td>
               <td :class="{negative: Number(d.amount) < 0}">{{ money(d.amount) }}</td><td>{{ formatDate(d.depositDate) }}</td><td>{{ statusText(d.status) }}</td>
               <td class="row-actions">
+                <button v-if="d.auditStatus==='PENDING'" @click="approveWithdrawal(d.id)">通过</button>
                 <button @click="openDepositDetail(d)">查看</button>
                 <button @click="openDeposit(d)">编辑</button>
                 <button @click="setDepositStatus(d, d.status==='NORMAL'?'VOID':'NORMAL')">{{ d.status==='NORMAL'?'作废':'恢复' }}</button>
                 <button @click="deleteDeposit(d.id)">删除</button>
               </td>
             </tr>
-            <tr v-if="deposits.length === 0"><td colspan="6">暂无存账单记录</td></tr>
+            <tr v-if="deposits.length === 0"><td colspan="7">暂无存账单记录</td></tr>
             </tbody>
           </table>
         </div>
@@ -227,10 +229,11 @@
       </form>
 
       <form class="modal" v-if="showDeposit" @submit.prevent="saveDeposit">
-        <h2>{{ depositForm.id ? '编辑存账单' : '新增存账单' }}</h2>
+        <h2>{{ depositForm.id ? (depositForm.billType==='WITHDRAW' ? '编辑取钱单' : '编辑存账单') : '新增存账单' }}</h2>
         <label>存款人<input v-model.trim="depositForm.depositorName" required></label>
         <label v-if="depositForm.id && me.role==='ADMIN'">所属用户<select v-model.number="depositForm.ownerUserId"><option v-for="u in users" :key="u.userId" :value="u.userId">{{ u.username }}</option></select></label>
-        <label>存款金额<input type="number" min="0.01" step="0.01" v-model.number="depositForm.amount" required></label>
+        <label>类型<input :value="depositBillTypeText(depositForm.billType, depositForm.amount)" disabled></label>
+        <label>{{ depositForm.billType==='WITHDRAW' ? '取钱金额' : '存款金额' }}<input type="number" :min="depositForm.billType==='WITHDRAW' ? null : '0.01'" :max="depositForm.billType==='WITHDRAW' ? '-0.01' : null" step="0.01" v-model.number="depositForm.amount" required></label>
         <label>存款银行<input v-model.trim="depositForm.bank" required></label>
         <label>存款时间<span class="date-field"><input type="date" v-model="depositForm.depositDate" required><span v-if="!depositForm.depositDate">年 / 月 / 日</span></span></label>
         <label>到期时间<span class="date-field"><input type="date" v-model="depositForm.dueDate" required><span v-if="!depositForm.dueDate">年 / 月 / 日</span></span></label>
@@ -263,6 +266,7 @@
           <span>所属用户：{{ usernameById(detail.bill.ownerUserId) }}</span>
           <span v-if="detailType==='BORROW' && detail.bill.borrowerName">借款人：{{ detail.bill.borrowerName }}</span>
           <span v-if="detailType==='DEPOSIT' && detail.bill.depositorName">存款人：{{ detail.bill.depositorName }}</span>
+          <span v-if="detailType==='DEPOSIT'">类型：{{ depositBillTypeText(detail.bill.billType, detail.bill.amount) }}</span>
           <span v-if="detailType==='DEPOSIT'">银行：{{ detail.bill.bank }}</span>
           <span>金额：{{ money(detail.bill.amount) }}</span>
           <span v-if="detail.bill.paidAmount !== undefined">已还：{{ money(detail.bill.paidAmount || 0) }}</span>
@@ -272,6 +276,7 @@
           <span v-if="detailType==='BORROW' && detail.bill.dueDate">还款日：{{ formatDate(detail.bill.dueDate) }}</span>
           <span v-if="detailType==='DEPOSIT' && detail.bill.dueDate">到期日：{{ formatDate(detail.bill.dueDate) }}</span>
           <span v-if="detail.bill.status">状态：{{ statusText(detail.bill.status) }}</span>
+          <span v-if="detailType==='DEPOSIT' && detail.bill.auditStatus">审核：{{ auditText(detail.bill.auditStatus) }}</span>
           <span v-if="detailType==='BORROW' && detail.bill.auditStatus">审核：{{ auditText(detail.bill.auditStatus) }}</span>
           <span v-if="detailType==='BORROW' && detail.bill.auditMailStatus">审核邮件：{{ mailStatusText(detail.bill.auditMailStatus) }}</span>
           <span v-if="detailType==='BORROW' && detail.bill.auditMailSentAt">审核邮件发送时间：{{ formatDateTime(detail.bill.auditMailSentAt) }}</span>
